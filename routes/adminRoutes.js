@@ -1,0 +1,78 @@
+const adminMiddleware = require('../middlewere/adminMiddleware')
+const authMiddleware = require('../middlewere/authMiddleware')
+const adminController = require('../controllers/adminControllers')
+const express = require('express')
+const path = require('path'); // Make sure this is included
+const fs = require('fs');
+
+const router = express.Router()
+
+
+router.get('/get-users', authMiddleware, adminMiddleware, adminController.getUsers)
+
+
+
+router.put('/encrypt-password', adminController.hashPassword)
+
+
+router.get('/get-dealer/:user_id', authMiddleware, adminMiddleware, adminController.checkUserId)
+
+
+router.post('/add-user', authMiddleware, adminMiddleware, adminController.insert_user)
+
+
+router.put('/update-dealer/:dealerCode', authMiddleware, adminMiddleware, adminController.update_user_details)
+
+
+router.put('/update-zone', authMiddleware, adminMiddleware, adminController.update_user_zone)
+
+
+
+router.post('/get_zone_data', authMiddleware, adminMiddleware, adminController.getZonedata)
+
+
+
+
+router.post('/update_profile_data',authMiddleware,adminMiddleware, adminController.updateProfile)
+
+router.get('/getTrsansactionDetails_data', authMiddleware,adminMiddleware, adminController.getTrsansactionDetails_data);
+
+
+router.get('/getURL_data',authMiddleware,adminMiddleware, adminController.ClickDataGet)
+
+
+
+router.get('/getURL_data_zone',authMiddleware,adminMiddleware, adminController.getURL_data_zone)
+
+
+
+
+
+router.get('/Dahboard_data_admin' , authMiddleware ,adminMiddleware, adminController.Dahboard_data_admin)
+
+
+router.post('/getDealerDetailsZone' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsZone)
+
+
+
+// router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
+
+
+
+
+router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+module.exports = router
