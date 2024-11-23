@@ -9,6 +9,7 @@ const authService = require('../services/authServices')
 
 const bcrypt = require ('bcrypt')
 const uploadHelper = require ('../utilities/uploadHelper');
+const  generateUniqueId =require('../utilities/uniqueNumber')
 
 const getCurrentDateTime = require('../utilities/DateTimefunction')
 
@@ -834,8 +835,7 @@ SELECT
   
 exports.getDealerDetailsRegion = async (req, res) => {
     try {
-
-        const {date ,time}= getCurrentDateTime()
+      const { date, time } = getCurrentDateTime();
       const filePath = path.join(__dirname, '../upload/PDSA_202411170603011.csv'); // Path to your CSV file.
   
       // Ensure the file exists
@@ -847,33 +847,141 @@ exports.getDealerDetailsRegion = async (req, res) => {
       }
   
       const dataToInsert = [];
+      const linkDetailsToInsert = [];
   
-      // Read and parse the CSV file
-      fs.createReadStream(filePath)
-        .pipe(csvParser())
-        .on('data', (row) => {
-         
+      const processCsvFile = () => {
+        return new Promise((resolve, reject) => {
+          fs.createReadStream(filePath)
+            .pipe(csvParser())
+            .on('data', async (row) => {
+              try {
+                // Concatenate first name and last name
+                const fullName = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
+                const admin_id = 'manthanadmin';
+                const user_id = 'isly_honda';
+                const final_message = 'final_message';
+                const status = '1';
+                const feedback_url = 'https://smscounter.com/isly/feedback/feedback_form.php?data=isly.in/20Vfcz9m0N';
+                const vedio_url = 'https://www.honda2wheelersindia.com/safetyindia/initiatives/roadsafetyvideos';
   
-          // Concatenate first name and last name
-          const fullName = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
-        const admin_id=  "manthanadmin"
-        const user_id=  "isly_honda"
-        const final_message= "final_message"
-        const status = "1"
-        const feedback_url= "https://smscounter.com/isly/feedback/feedback_form.php?data=isly.in/20Vfcz9m0N"
-
-        const feedback_short_url=""
-
-        const vedio_url = "https://www.honda2wheelersindia.com/safetyindia/initiatives/roadsafetyvideos"
-
-        const vedio_short_url =""
-          // Push row data to the array for bulk insertion
-          dataToInsert.push([
-            fullName,
-            row['Customer mobile number'],
-            row['Frame No'],
-            row['Dealer_Code'],
-            row['MODEL_NAME'],
+                // Generate unique short URLs for feedback and video
+                let feedback_short_url;
+                let vedio_short_url;
+                let isUnique = false;
+  
+                while (!isUnique) {
+                  const uniqueId = generateUniqueId(10);
+                  feedback_short_url = `${uniqueId}/feedback`;
+                  vedio_short_url = `${uniqueId}/video`;
+  
+                  // Check if the short URLs are unique
+                  const checkFeedbackQuery = `SELECT COUNT(*) AS count FROM link_details WHERE short_url = ?`;
+                  const checkVideoQuery = `SELECT COUNT(*) AS count FROM link_details WHERE short_url = ?`;
+  
+                  try {
+                    const [checkFeedbackResult, checkVideoResult] = await Promise.all([
+                      executeQuery(checkFeedbackQuery, [feedback_short_url]),
+                      executeQuery(checkVideoQuery, [vedio_short_url])
+                    ]);
+  
+                    // Ensure the URLs are unique
+                    if (checkFeedbackResult[0].count === 0 && checkVideoResult[0].count === 0) {
+                      isUnique = true; // URLs are unique
+                    }
+                  } catch (error) {
+                    console.error('Error executing query:', error);
+                    throw new Error('Database query failed while checking unique short URLs.');
+                  }
+                }
+  
+                // Push row data for bulk insertion into `honda_url_data`
+                dataToInsert.push([
+                  fullName,
+                  row['Customer mobile number'],
+                  row['Frame No'],
+                  row['Dealer_Code'],
+                  row['MODEL_NAME'],
+                  admin_id,
+                  user_id,
+                  feedback_url,
+                  feedback_short_url,
+                  final_message,
+                  status,
+                  vedio_url,
+                  vedio_short_url,
+                  date,
+                  time,
+                ]);
+  
+                // Push link details for bulk insertion into `link_details`
+                linkDetailsToInsert.push([
+                  generateUniqueId({ length: 10 }), // Unique ID for this record
+                  feedback_url,
+                  feedback_short_url,
+                  date,
+                  time,
+                  admin_id,
+                  date, // Validity date can be set to current date or another value
+                  15, // Validity days
+                  'Active',
+                ]);
+              } catch (error) {
+                console.error('Error processing row:', error);
+              }
+            })
+            .on('end', () => {
+              resolve();
+            })
+            .on('error', (err) => {
+              reject(err);
+            });
+        });
+      };
+  
+      // Process the CSV file asynchronously
+      await processCsvFile();
+  
+      // Check if data is available to insert
+      if (dataToInsert.length === 0 && linkDetailsToInsert.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'CSV file is empty or contains invalid data.',
+        });
+      }
+  
+      // Bulk insert data into `link_details`
+      if (linkDetailsToInsert.length > 0) {
+        const insertQueryLinkDetails = `
+          INSERT INTO link_details (
+            unique_id,
+            org_url,
+            short_url,
+            create_date,
+            create_time,
+            created_by,
+            validity_date,
+            validity_days,
+            status
+          ) VALUES ?`;
+  
+        try {
+          const resultLinkDetails = await executeQuery(insertQueryLinkDetails, [linkDetailsToInsert]);
+          console.log('Inserted link details:', resultLinkDetails);
+        } catch (error) {
+          console.error('Error inserting link details:', error);
+          throw new Error('Failed to insert link details');
+        }
+      }
+  
+      // Bulk insert data into `honda_url_data`
+      if (dataToInsert.length > 0) {
+        const insertQueryHondaData = `
+          INSERT INTO honda_url_data (
+            cust_name,
+            mobile,
+            frame_no,
+            dealer_code,
+            model_name,
             admin_id,
             user_id,
             feedback_url,
@@ -882,65 +990,25 @@ exports.getDealerDetailsRegion = async (req, res) => {
             status,
             vedio_url,
             vedio_short_url,
-            date,
-            time
-          ]);
-        })
-        .on('end', async () => {
-          
+            cdate,
+            ctime
+          ) VALUES ?`;
   
-          if (dataToInsert.length === 0) {
-            return res.status(400).json({
-              success: false,
-              message: 'CSV file is empty or contains invalid data.',
-            });
-          }
+        try {
+          const resultHondaData = await executeQuery(insertQueryHondaData, [dataToInsert]);
+          console.log('Inserted honda_url_data:', resultHondaData);
+        } catch (error) {
+          console.error('Error inserting honda_url_data:', error);
+          throw new Error('Failed to insert honda_url_data');
+        }
+      }
   
-          // Define the INSERT query
-          const insertQuery = `
-            INSERT INTO honda_url_data (
-              cust_name,
-              mobile,
-              frame_no,
-              dealer_code,
-              model_name,
-              admin_id,
-              user_id,
-              feedback_url,
-              feedback_short_url,
-              final_message,
-              status,
-              vedio_url,
-              vedio_short_url,
-              cdate,
-              ctime
-            ) VALUES ?`;
+      // Send success response
+      res.status(200).json({
+        success: true,
+        message: `Data inserted successfully. Rows processed: ${dataToInsert.length}.`,
+      });
   
-          try {
-            // Execute the bulk insert query
-            await executeQuery(insertQuery, [dataToInsert]);
-  
-            res.status(200).json({
-              success: true,
-              message: 'Data inserted successfully from the CSV file.',
-            });
-          } catch (insertError) {
-            console.error('Error inserting data:', insertError);
-            res.status(500).json({
-              success: false,
-              message: 'Error inserting data into the database.',
-              error: insertError.message,
-            });
-          }
-        })
-        .on('error', (err) => {
-          console.error('Error reading CSV file:', err);
-          res.status(500).json({
-            success: false,
-            message: 'Error reading the CSV file.',
-            error: err.message,
-          });
-        });
     } catch (error) {
       console.error('Error processing the file:', error);
       res.status(500).json({
@@ -950,7 +1018,7 @@ exports.getDealerDetailsRegion = async (req, res) => {
       });
     }
   };
-
+  
   
 
   
