@@ -55,12 +55,12 @@ router.post('/getDealerDetailsZone' , authMiddleware ,adminMiddleware, adminCont
 
 
 
-// router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
-
-
-
-
 router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
+
+
+
+
+// router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
 
 
 
