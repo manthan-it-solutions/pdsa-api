@@ -11,7 +11,7 @@ const bcrypt = require ('bcrypt')
 const uploadHelper = require ('../utilities/uploadHelper');
 const  generateUniqueId =require('../utilities/uniqueNumber')
 
-const getCurrentDateTime = require('../utilities/DateTimefunction')
+const {getCurrentDateTime,addDaysToDate} = require('../utilities/DateTimefunction')
 
 
 
@@ -835,6 +835,8 @@ SELECT
   
 // exports.getDealerDetailsRegion = async (req, res) => {
 //     const { date, time } = getCurrentDateTime();
+//  const   days_add = addDaysToDate(date)
+//  console.log('days_add: ', days_add);
 //     const filePath = path.join(__dirname, '../upload/PDSA_202411170603011.csv'); // Ensure dynamic handling of the path.
   
 //     // Ensure the file exists
@@ -922,10 +924,10 @@ SELECT
 //             generateUniqueId(10), // Unique ID for this record
 //             feedback_url,
 //             feedback_short_url,
-//             date,
+//             days_add,
 //             time,
 //             admin_id,
-//             date, // Validity date can be set to current date or another value
+//             days_add, // Validity date can be set to current date or another value
 //             15, // Validity days
 //             '1',
 //           ]);
