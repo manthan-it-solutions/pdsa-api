@@ -137,7 +137,7 @@ WHERE short_url = ?
 
         
         await executeQuery(insert_data, [unique_id,url_client,clientIp,latitude,longitude,date,time,city,state,country]);
-  console.log(orgUrl,'orgUrlorgUrl');
+ 
         // Redirect to the URL with the unique_id appended as a query parameter
         res.status(200).send({success:'200' ,orgUrl});
       } else {
