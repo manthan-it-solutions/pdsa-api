@@ -48,113 +48,81 @@ app.use('/user', userroutes);
 
 
 
-  app.post ('/api/log-404', async (req, res, next) => {
-    console.log(req.body,'sudjvuyjvuj');
-    // Get the client IP address
-    let clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-   
+app.post('/api/log-404', async (req, res) => {
   
-    // Check if the IP is IPv4-mapped IPv6 and extract IPv4
+  try {
+    const { url: url_client, latitude, longitude, city, state, country } = req.body;
+
+    // Get client IP address
+    let clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     if (clientIp.startsWith('::ffff:')) {
       clientIp = clientIp.replace('::ffff:', '');
     }
-  
-    // Get latitude/longitude based on IP (using geoip-lite)
+
+    // Get geolocation based on IP using geoip-lite or fallback to external API
     let geo = geoip.lookup(clientIp);
- 
-  
     if (!geo || !geo.ll) {
-      console.log('IP not found in geoip-lite, using external API...');
-  
-      // Fallback to an external API if geoip-lite fails
       try {
         const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
         const data = response.data;
-  
-        if (data.status === 'success') {
-          geo = {
-            ll: [data.lat, data.lon]
-          };
-        } else {
-          console.log('External API failed to provide geolocation.');
-          geo = { ll: ['Unknown', 'Unknown'] };
-        }
+
+        geo = data.status === 'success' ? { ll: [data.lat, data.lon] } : { ll: ['Unknown', 'Unknown'] };
       } catch (error) {
         console.error('Error fetching geolocation from external API:', error);
         geo = { ll: ['Unknown', 'Unknown'] };
       }
     }
-  
 
- 
-  
-    // The rest of your code remains unchanged
-    const url_client = req.body.url;
-    const latitude = req.body.latitude;
-    const longitude = req.body.longitude;
-    const city = req.body.city;
-    const state = req.body.state;
-    const country = req.body.country;
-    
-    const id = url_client
-    console.log('id: ', id);
-    const unique_id = id;
-    console.log('unique_id: ', unique_id);
-  
-    const {date , time} = getCurrentDateTime();
-   
-   
-  
-    // Query to fetch original URL and increment visit count
+    const unique_id = url_client; // Assuming URL is the unique identifier
+    const { date, time } = getCurrentDateTime();
+    const url_type = url_client.split('/')[2]; // Determine URL type
+    console.log('url_type: ', url_type);
+
+    // Prepare queries
     const qrySelect = `
-     SELECT org_url, visit_count 
-FROM link_details 
-WHERE short_url = ? 
-  AND validity_date >= ? 
-  AND status = ?
-
+      SELECT 
+        ${url_type === 'feedback' ? 'feedback_url' : 'vedio_url'} 
+      AS org_url 
+      FROM honda_url_data 
+      WHERE ${url_type === 'feedback' ? 'feedback_short_url' : 'vedio_short_url'} = ? 
     `;
-  
+
     const qryUpdateVisitCount = `
-      UPDATE link_details 
-      SET visit_count = visit_count + 1 
-      WHERE short_url = ?
+      UPDATE honda_url_data 
+      SET 
+        ${url_type === 'feedback' ? 'feedback_count = feedback_count + 1, feedback_click_city = ?, click_state = ?, click_country = ?' : 'visit_count_vedio = visit_count_vedio + 1, vedio_click_city = ?, vedio_click_state = ?, vedio_click_country = ?'} 
+      WHERE ${url_type === 'feedback' ? 'feedback_short_url' : 'vedio_short_url'} = ?
     `;
-  
-  
-    const insert_data=`INSERT INTO ip_address_client ( unique_id,url_input, ip_client,latitude,longitude,click_date,click_time,city,state,country) VALUES (?,?, ?,?,?,?,?,?,?,?)`
-  
-    try {
-      const result = await executeQuery(qrySelect, [unique_id, date,"1"]);
-      console.log('result: ', result);
-  
-      if (result.length > 0) {
-        const orgUrl = result[0].org_url;
-     
-  
-        // Increment the visit count
-        await executeQuery(qryUpdateVisitCount, [unique_id]);
 
-        
-        await executeQuery(insert_data, [unique_id,url_client,clientIp,latitude,longitude,date,time,city,state,country]);
+
+
+    // Execute SELECT query to fetch original URL
+    const selectResult = await executeQuery(qrySelect, [unique_id]);
+    if (selectResult.length > 0) {
+      const orgUrl = selectResult[0].org_url;
+
+      // Increment visit count
+      await executeQuery(qryUpdateVisitCount, [city, state, country, unique_id]);
+
+      // Log click data
  
-        // Redirect to the URL with the unique_id appended as a query parameter
-        res.status(200).send({success:'200' ,orgUrl});
-      } else {
-        // Respond with 404 and pass the client IP address, URL, and latitude, along with the unique ID to the view
-        res.status(404).json({ 
-          clientIp, 
-          url_client, 
-          latitude, 
-          longitude,
-          unique_id 
-        });
-      }
-    } catch (error) {
-      console.error('Database query error:', error);
-      res.status(500).send('Internal Server Error');
+
+      res.status(200).send({ success: '200', orgUrl, unique_id });
+    } else {
+      res.status(404).json({
+        message: 'URL not found',
+        clientIp,
+        url_client,
+        latitude: latitude || geo.ll[0],
+        longitude: longitude || geo.ll[1],
+        unique_id,
+      });
     }
-  });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
   
 
 // Error handling middleware
