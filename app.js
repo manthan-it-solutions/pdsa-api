@@ -111,7 +111,7 @@ app.use('/user', userroutes);
 FROM link_details 
 WHERE short_url = ? 
   AND validity_date >= ? 
-  AND status = '1'
+  AND status = ?
 
     `;
   
@@ -125,7 +125,7 @@ WHERE short_url = ?
     const insert_data=`INSERT INTO ip_address_client ( unique_id,url_input, ip_client,latitude,longitude,click_date,click_time,city,state,country) VALUES (?,?, ?,?,?,?,?,?,?,?)`
   
     try {
-      const result = await executeQuery(qrySelect, [unique_id, date]);
+      const result = await executeQuery(qrySelect, [unique_id, date,"1"]);
       console.log('result: ', result);
   
       if (result.length > 0) {
@@ -136,7 +136,7 @@ WHERE short_url = ?
 
         
         await executeQuery(insert_data, [unique_id,url_client,clientIp,latitude,longitude,date,time,city,state,country]);
-  
+  console.log(orgUrl,'orgUrlorgUrl');
         // Redirect to the URL with the unique_id appended as a query parameter
         res.status(200).send({success:'200' ,orgUrl});
       } else {
