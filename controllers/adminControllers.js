@@ -405,9 +405,9 @@ exports.ClickDataGet = async (req, res) => {
                 (SELECT COUNT(*) 
                  FROM honda_url_data hu 
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE region = dm.region) 
-                 AND hu.v_c_date IS NOT NULL
-                 AND MONTH(hu.v_c_date) = MONTH(CURRENT_DATE())
-                 AND YEAR(hu.v_c_date) = YEAR(CURRENT_DATE())) AS video_send_count,
+                 AND hu.cdate IS NOT NULL
+                 AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                 AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
 
                 -- Count of video clicks for the current region (with a non-null v_c_date)
                 (SELECT COUNT(*) 
@@ -422,9 +422,9 @@ exports.ClickDataGet = async (req, res) => {
                 (SELECT COUNT(*) 
                  FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE region = dm.region) 
-                 AND hu.click_date IS NOT NULL
-                 AND MONTH(hu.click_date) = MONTH(CURRENT_DATE())
-                 AND YEAR(hu.click_date) = YEAR(CURRENT_DATE())) AS total_feedback_sms_sent,
+                 AND hu.cdate IS NOT NULL
+                 AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                 AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS total_feedback_sms_sent,
 
                 -- Count of feedback click records for the current region
                 (SELECT COUNT(*) 
@@ -496,9 +496,9 @@ exports.getURL_data_zone = async (req, res) => {
                 (SELECT COUNT(*) 
                  FROM honda_url_data hu 
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
-                 AND hu.v_c_date IS NOT NULL
-                 AND MONTH(hu.v_c_date) = MONTH(CURRENT_DATE())
-                 AND YEAR(hu.v_c_date) = YEAR(CURRENT_DATE())) AS video_send_count,
+                 AND hu.cdate IS NOT NULL
+                 AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                 AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
 
                 -- Count of video clicks for the current zone (with a non-null v_c_date)
                 (SELECT COUNT(*) 
@@ -513,9 +513,9 @@ exports.getURL_data_zone = async (req, res) => {
                 (SELECT COUNT(*) 
                  FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
-                 AND hu.click_date IS NOT NULL
-                 AND MONTH(hu.click_date) = MONTH(CURRENT_DATE())
-                 AND YEAR(hu.click_date) = YEAR(CURRENT_DATE())) AS total_feedback_sms_sent,
+                 AND hu.cdate IS NOT NULL
+                 AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                 AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS total_feedback_sms_sent,
 
                 -- Count of feedback click records for the current zone
                 (SELECT COUNT(*) 
@@ -673,9 +673,9 @@ SELECT
           (SELECT COUNT(*) 
            FROM honda_url_data hu 
            WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
-           AND hu.v_c_date IS NOT NULL
-           AND MONTH(hu.v_c_date) = MONTH(CURRENT_DATE())
-           AND YEAR(hu.v_c_date) = YEAR(CURRENT_DATE())) AS video_send_count,
+           AND hu.cdate IS NOT NULL
+           AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+           AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
     
           -- Dealer details (individual dealer data) for this zone
           hu.dealer_code,
@@ -705,9 +705,9 @@ SELECT
           dealer_master dm
         LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
         WHERE 
-          hu.v_c_date IS NOT NULL
-          AND MONTH(hu.v_c_date) = MONTH(CURRENT_DATE())
-          AND YEAR(hu.v_c_date) = YEAR(CURRENT_DATE())`;
+          hu.cdate IS NOT NULL
+          AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+          AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())`;
   
       // Add zone condition if a zone is provided
       if (zone) {
@@ -762,9 +762,9 @@ SELECT
           (SELECT COUNT(*) 
            FROM honda_url_data hu 
            WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE region = dm.region) 
-           AND hu.v_c_date IS NOT NULL
-           AND MONTH(hu.v_c_date) = MONTH(CURRENT_DATE())
-           AND YEAR(hu.v_c_date) = YEAR(CURRENT_DATE())) AS video_send_count,
+           AND hu.cdate IS NOT NULL
+           AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+           AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
           
           -- Dealer details for this region
           hu.dealer_code,
@@ -793,9 +793,9 @@ SELECT
           dealer_master dm
         LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
         WHERE 
-          hu.v_c_date IS NOT NULL
-          AND MONTH(hu.v_c_date) = MONTH(CURRENT_DATE())
-          AND YEAR(hu.v_c_date) = YEAR(CURRENT_DATE())`;
+          hu.cdate IS NOT NULL
+          AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+          AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())`;
   
       // Add region condition if a region is provided
       const params = [];
