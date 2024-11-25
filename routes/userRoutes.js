@@ -22,6 +22,9 @@ router.get('/getURL_data_user' , authMiddleware , userController.getURL_data_use
 router.get('/get_dashboard_data_user' , authMiddleware , userController.get_dashboard_data_user)
 
 
+router.post('/select_user_details_by_link' , authMiddleware , userController.select_user_details_by_user_id)
+
+
 
 
 

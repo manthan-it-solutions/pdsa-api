@@ -271,6 +271,28 @@ exports.get_dashboard_data_user = async (req, res) => {
 
 
 
+exports.select_user_details_by_user_id  = async (req,res)=>{
+    console.log('hit1111');
+    try {
+        const id = req.body.id
+
+     
+        const query_select_details= `select cust_name ,mobile,model_name from honda_url_data  where feedback_short_url=? OR vedio_short_url=?  `
+       
+        const result = await executeQuery(query_select_details,[id,id])
+        console.log('result: ', result);
+
+        res.status(200).send({success:"200", data:result})
+
+
+    } catch (error) {
+        console.log('error: ', error);
+        res.status(500).send({message:error})
+    }
+}
+
+
+
 
 
 
