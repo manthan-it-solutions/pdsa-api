@@ -15,15 +15,17 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Enable CORS for localhost:3000
-app.use(cors({
-    origin: 'http://localhost:3000',  // Allow requests only from localhost:3000
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true // Enable cookies if needed
-}));
+// app.use(cors({
+//     // origin: 'http://localhost:3000', 
+//     origin: 'http://192.168.0.122:3000/', // Allow requests only from localhost:3000
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//     credentials: true // Enable cookies if needed
+// }));
 
+app.use(cors())
 // Handle preflight (OPTIONS) requests
-app.options('*', cors());
+// app.options('*', cors());
 
 // Middleware to parse JSON data
 app.use(express.json());
