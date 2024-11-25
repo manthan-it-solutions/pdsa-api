@@ -873,7 +873,7 @@ SELECT
 //           const user_id = 'isly_honda';
 //           const final_message = 'final_message';
 //           const status = '1';
-//           const feedback_url = 'https://smscounter.com/isly/feedback/feedback_form.php?data=isly.in/20Vfcz9m0N';
+//           const feedback_url = process.env.LINKFEEDBACK;
 //           const vedio_url = 'https://www.honda2wheelersindia.com/safetyindia/initiatives/roadsafetyvideos';
   
 //           // Generate unique short URLs
