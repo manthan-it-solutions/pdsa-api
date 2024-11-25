@@ -7,7 +7,7 @@ const userroutes = require('./routes/userRoutes');
 const errorMiddleware = require('./middlewere/errorMiddleware');
 const fileUpload = require('express-fileupload');
 const geoip = require('geoip-lite');
-const getCurrentDateTime  =require('./utilities/DateTimefunction')
+const {getCurrentDateTime } =require('./utilities/DateTimefunction')
 const {executeQuery} = require('./dbconfig/dbConfig')
 
 const axios =require('axios')
@@ -130,6 +130,7 @@ WHERE short_url = ?
   
       if (result.length > 0) {
         const orgUrl = result[0].org_url;
+     
   
         // Increment the visit count
         await executeQuery(qryUpdateVisitCount, [unique_id]);

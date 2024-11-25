@@ -1,4 +1,4 @@
-function getCurrentDateTime() {
+const  getCurrentDateTime =()=> {
     const now = new Date();
 
     // Format date as yyyy-mm-dd
@@ -11,5 +11,16 @@ function getCurrentDateTime() {
 }
 
 
+const addDaysToDate = (dateString, daysToAdd) => {
+    const date = new Date(dateString); // Convert string to Date object
+    date.setDate(date.getDate() + daysToAdd); // Add days
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0"); // Ensure 2-digit month
+    const day = String(date.getDate()).padStart(2, "0"); // Ensure 2-digit day
+    return `${year}-${month}-${day}`; // Return in yyyy-mm-dd format
+  };
+  
 
-module.exports=getCurrentDateTime
+
+
+module.exports={getCurrentDateTime,addDaysToDate}
