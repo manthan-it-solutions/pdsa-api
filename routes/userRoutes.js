@@ -26,6 +26,10 @@ router.post('/select_user_details_by_link' , authMiddleware , userController.sel
 
 
 
+router.post('/submit_feedback' , authMiddleware , userController.submit_feedback)
+
+
+
 
 
 

@@ -14,14 +14,6 @@ const axios =require('axios')
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Enable CORS for localhost:3000
-// app.use(cors({
-//     // origin: 'http://localhost:3000', 
-//     origin: 'http://192.168.0.122:3000/', // Allow requests only from localhost:3000
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization'],
-//     credentials: true // Enable cookies if needed
-// }));
 
 app.use(cors())
 // Handle preflight (OPTIONS) requests
@@ -92,7 +84,7 @@ app.post('/api/log-404', async (req, res) => {
     const qryUpdateVisitCount = `
       UPDATE honda_url_data 
       SET 
-        ${url_type === 'feedback' ? 'feedback_count = feedback_count + 1, feedback_click_city = ?, click_state = ?, click_country = ?' : 'visit_count_vedio = visit_count_vedio + 1, vedio_click_city = ?, vedio_click_state = ?, vedio_click_country = ?'} 
+        ${url_type === 'feedback' ? 'feedback_count = feedback_count + 1, feedback_click_city = ?, click_state = ?, click_country = ?' : 'visit_count_vedio = visit_count_vedio + 1, vedio_click_city = ?, v_click_date  = ? ,  v_click_time  = ?   ,vedio_click_state = ?, vedio_click_country = ?'} 
       WHERE ${url_type === 'feedback' ? 'feedback_short_url' : 'vedio_short_url'} = ?
     `;
 
@@ -104,7 +96,7 @@ app.post('/api/log-404', async (req, res) => {
       const orgUrl = selectResult[0].org_url;
 
       // Increment visit count
-      await executeQuery(qryUpdateVisitCount, [city, state, country, unique_id]);
+      await executeQuery(qryUpdateVisitCount, [city,date,time, state, country, unique_id]);
 
       // Log click data
  

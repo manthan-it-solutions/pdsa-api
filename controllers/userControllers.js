@@ -6,6 +6,7 @@ const authService = require('../services/authServices')
 
 const bcrypt = require ('bcrypt')
 const uploadHelper = require ('../utilities/uploadHelper');
+const { getCurrentDateTime } = require('../utilities/DateTimefunction');
 
 
 
@@ -275,9 +276,30 @@ exports.select_user_details_by_user_id  = async (req,res)=>{
     console.log('hit1111');
     try {
         const id = req.body.id
+      
 
      
-        const query_select_details= `select cust_name ,mobile,model_name from honda_url_data  where feedback_short_url=? OR vedio_short_url=?  `
+        const query_select_details= `
+  SELECT 
+    h.cust_name,
+    h.mobile,
+    h.model_name,
+    h.feedback_answer1,
+    h.feedback_answer2,
+    h.feedback_answer3,
+    h.feedback_answer4,
+    h.feedback_answer5,
+    d.dealer_name
+  FROM 
+    honda_url_data h
+  LEFT JOIN 
+    dealer_master d 
+    ON h.dealer_code = d.dealer_code
+  WHERE 
+    h.feedback_short_url = ? 
+    OR h.vedio_short_url = ?
+
+`
        
         const result = await executeQuery(query_select_details,[id,id])
         console.log('result: ', result);
@@ -288,6 +310,50 @@ exports.select_user_details_by_user_id  = async (req,res)=>{
     } catch (error) {
         console.log('error: ', error);
         res.status(500).send({message:error})
+    }
+}
+
+
+
+exports.submit_feedback = async (req,res)=>{
+
+    try {
+console.log(req.body,'req.bodyreq.body');
+        const { fullName,mobileNumber,modelName,dealership,receivedInfo,infoFormat,simulator,satisfaction,deliveryExperience}=req.body.formData 
+const id = req.body.id
+        const {date,time} = getCurrentDateTime()
+        
+
+
+        const update_feedback_from = `UPDATE honda_url_data
+SET 
+    feedback_answer1 = ?,
+    feedback_answer2 = ?,
+    feedback_answer3 = ?,
+    feedback_answer4 = ?,
+    feedback_answer5 = ?,
+    feedback_date = ?,
+    feedback_time = ?
+WHERE 
+    feedback_short_url =? 
+    OR vedio_short_url =?;
+`
+
+
+        values =[receivedInfo,infoFormat,simulator,satisfaction,deliveryExperience,date,time,id,id]
+        console.log('values: ', values);
+
+
+
+
+
+        const result = await executeQuery (update_feedback_from,values)
+
+        res.status(200).send({success:"updated"})
+    } catch (error) {
+        console.log('error: ', error);
+        res.status(500).send ({message:error})
+        
     }
 }
 
