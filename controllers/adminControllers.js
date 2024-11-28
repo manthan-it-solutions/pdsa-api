@@ -746,276 +746,360 @@ SELECT
 
 
 
-//   exports.getDealerDetailsRegion = async (req, res) => {
-//     try {
-//       // Get region and pagination params from the request body
-//       const region = req.body.region; // Region parameter to filter
-//       const { page = 1, limit = 10 } = req.body; // Default pagination values
-//       const offset = (page - 1) * limit;
+  // exports.getDealerDetailsRegion = async (req, res) => {
+  //   try {
+  //     // Get region and pagination params from the request body
+  //     const region = req.body.region; // Region parameter to filter
+  //     const columnName = req.body.columnName; // Region parameter to filter
+  //     const { page = 1, limit = 10 } = req.body; // Default pagination values
+  //     const offset = (page - 1) * limit;
   
-//       // Construct the SQL query with conditional region filter
-//       let query = `
-//         SELECT 
-//           dm.region AS region,
+  //     // Construct the SQL query with conditional region filter
+  //     let query = `
+  //       SELECT 
+  //         dm.region AS region,
           
-//           -- Count of video links for the current region
-//           (SELECT COUNT(*) 
-//            FROM honda_url_data hu 
-//            WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE region = dm.region) 
-//            AND hu.cdate IS NOT NULL
-//            AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
-//            AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
+  //         -- Count of video links for the current region
+  //         (SELECT COUNT(*) 
+  //          FROM honda_url_data hu 
+  //          WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE region = dm.region) 
+  //          AND hu.cdate IS NOT NULL
+  //          AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+  //          AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
           
-//           -- Dealer details for this region
-//           hu.dealer_code,
-//           hu.cdate,
-//           hu.ctime,
-//           hu.v_c_date,
-//           hu.v_click_date,
-//           hu.click_date,
-//           hu.feedback_date,
-//           dm.main_dealer,
-//           dm.dealer_name,
-//           dm.dealer_type,
-//           dm.dealer_code AS Dealer_code,
-//           dm.region AS Dealer_Region,
-//           dm.state AS Dealer_State,
-//           dm.city AS Dealer_City,
-//           hu.model_name,
-//           hu.feedback_answer1,
-//           hu.feedback_answer2,
-//           hu.feedback_answer3,
-//           hu.feedback_answer4,
-//           hu.feedback_answer5,
-//           hu.feedback_date,
-//           hu.feedback_time
-//         FROM 
-//           dealer_master dm
-//         LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
-//         WHERE 
-//           hu.cdate IS NOT NULL
-//           AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
-//           AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())`;
+  //         -- Dealer details for this region
+  //         hu.dealer_code,
+  //         hu.cdate,
+  //         hu.ctime,
+  //         hu.v_c_date,
+  //         hu.v_click_date,
+  //         hu.click_date,
+  //         hu.feedback_date,
+  //         dm.main_dealer,
+  //         dm.dealer_name,
+  //         dm.dealer_type,
+  //         dm.dealer_code AS Dealer_code,
+  //         dm.region AS Dealer_Region,
+  //         dm.state AS Dealer_State,
+  //         dm.city AS Dealer_City,
+  //         hu.model_name,
+  //         hu.feedback_answer1,
+  //         hu.feedback_answer2,
+  //         hu.feedback_answer3,
+  //         hu.feedback_answer4,
+  //         hu.feedback_answer5,
+  //         hu.feedback_date,
+  //         hu.feedback_time
+  //       FROM 
+  //         dealer_master dm
+  //       LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+  //       WHERE 
+  //         hu.cdate IS NOT NULL
+  //         AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+  //         AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())`;
   
-//       // Add region condition if a region is provided
-//       const params = [];
-//       if (region) {
-//         query += ` AND dm.region = ?`;
-//         params.push(region);
+  //     // Add region condition if a region is provided
+  //     const params = [];
+  //     if (region) {
+  //       query += ` AND dm.region = ?`;
+  //       params.push(region);
+  //     }
+  
+  //     // Add pagination and region order
+  //     query += `
+  //       ORDER BY 
+  //         FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+  //       LIMIT ? OFFSET ?;
+  //     `;
+  //     params.push(parseInt(limit), parseInt(offset));
+  
+  //     // Execute the query
+  //     const result = await executeQuery(query, params);
+  
+  //     // Send the response with the data
+  //     res.status(200).json({
+  //       success: true,
+  //       message: 'Data fetched successfully',
+  //       data: result,
+  //       page: parseInt(page),
+  //       limit: parseInt(limit),
+  //     });
+  //   } catch (error) {
+  //     console.error('Error fetching dealer details:', error);
+  //     res.status(500).json({
+  //       success: false,
+  //       message: 'Internal Server Error',
+  //       error: error.message,
+  //     });
+  //   }
+  // };
+  
+
+
+
+  exports.getDealerDetailsRegion = async (req, res) => {
+    try {
+        console.log('req.body:', req.body);
+
+        const columnName = req.body.columnName;
+
+        // Define queries for specific metrics
+        const metricFilters = {
+            video_send_count: `hu.v_c_date IS NOT NULL`,
+            video_click_count: `hu.data_type = 'Video' AND hu.v_click_date IS NOT NULL AND hu.v_click_date != ''`,
+            total_feedback_click_count: `hu.f_click_date IS NOT NULL AND hu.f_click_date != ''`,
+            feedback_sms_video_count: `hu.click_date IS NOT NULL AND hu.feedback_date != ''`,
+        };
+
+        if (!metricFilters[columnName]) {
+            return res.status(400).json({ message: 'Invalid columnName provided' });
+        }
+
+        const dealerDetailsQuery = `
+            SELECT 
+                dm.region AS region,    
+                hu.dealer_code,
+                hu.cdate,
+                hu.ctime,
+                hu.v_c_date,
+                hu.v_click_date,
+                hu.click_date,
+                hu.feedback_date,
+                dm.main_dealer,
+                dm.dealer_name,
+                dm.dealer_type,
+                dm.dealer_code AS Dealer_code,
+                dm.region AS Dealer_region,
+                dm.state AS Dealer_State,
+                dm.city AS Dealer_City,
+                hu.model_name,
+                hu.feedback_answer1,
+                hu.feedback_answer2,
+                hu.feedback_answer3,
+                hu.feedback_answer4,
+                hu.feedback_answer5,
+                hu.feedback_date,
+                hu.feedback_time
+            FROM 
+                dealer_master dm
+            LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+            WHERE 
+                ${metricFilters[columnName]} 
+            ORDER BY 
+                FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+        `;
+
+        const dealerDetailsResult = await executeQuery(dealerDetailsQuery);
+
+        const metricCountQuery = `
+            SELECT COUNT(*) AS ${columnName}
+            FROM honda_url_data hu
+            WHERE hu.dealer_code IN 
+                (SELECT dealer_code FROM dealer_master) 
+                AND ${metricFilters[columnName]};
+        `;
+
+        const [metricCountResult] = await executeQuery(metricCountQuery);
+
+        const combinedResult = dealerDetailsResult.map(dealer => ({
+            ...dealer,
+            [columnName]: metricCountResult ? metricCountResult[columnName] : 0,
+        }));
+
+        console.log('combinedResult:', combinedResult.length);
+        res.status(200).json({ success: '200', data: combinedResult });
+    } catch (error) {
+        console.error('Error fetching region data:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+
+
+
+
+
+// exports.getDealerDetailsRegion = async (req, res) => {
+//   const { date, time } = getCurrentDateTime();
+//   const days_add = addDaysToDate(date);
+//   const filePath = path.join(__dirname, '../upload/PDSA_202411170603011.csv'); // Ensure dynamic file path handling.
+
+//   // Ensure the file exists
+//   if (!fs.existsSync(filePath)) {
+//     return res.status(404).json({
+//       success: false,
+//       message: 'File not found.',
+//     });
+//   }
+
+//   const batchSize = 50; // Process 50 rows at a time
+
+//   const processCsvFile = async () => {
+//     const dataToInsert = [];
+//     const linkDetailsToInsert = [];
+//     const rows = []; // Store rows for sequential processing
+
+//     // Read and parse CSV
+//     await new Promise((resolve, reject) => {
+//       fs.createReadStream(filePath)
+//         .pipe(csvParser())
+//         .on('data', (row) => {
+//           rows.push(row); // Store row for later processing
+//         })
+//         .on('end', resolve)
+//         .on('error', reject);
+//     });
+
+//     for (let i = 0; i < rows.length; i++) {
+//       try {
+//         const row = rows[i];
+//         const fullName = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
+//         const admin_id = 'manthanadmin';
+//         const user_id = 'isly_honda';
+//         const final_message = 'final_message';
+//         const status = '1';
+       
+//         const vedio_url = process.env.LINKVEDIOLINK;
+//         const url_side = process.env.URL_SERVER;
+
+//         // Generate unique short URLs
+//         const feedback_short_url = await generateUniqueShortUrl('link_details', url_side);
+//         const vedio_short_url = await generateUniqueShortUrl('link_details', url_side);
+//  const feedback_url = `http://192.168.0.122:3000/feedback?id=${feedback_short_url}`
+//         // Prepare data for bulk insertion
+//         dataToInsert.push([
+//           fullName,
+//           row['Customer mobile number'],
+//           row['Frame No'],
+//           row['Dealer_Code'],
+//           row['MODEL_NAME'],
+//           admin_id,
+//           user_id,
+//           feedback_url,
+//           feedback_short_url,
+//           final_message,
+//           status,
+//           vedio_url,
+//           vedio_short_url,
+//           date,
+//           time,
+//         ]);
+
+//         linkDetailsToInsert.push([
+//           generateUniqueId(10), // Unique ID for this record
+//           feedback_url,
+//           feedback_short_url,
+//           days_add,
+//           time,
+//           admin_id,
+//           days_add, // Validity date
+//           15, // Validity days
+//           '1',
+//         ]);
+
+//         // Insert batch when the size is reached or it's the last row
+//         if (dataToInsert.length >= batchSize || i === rows.length - 1) {
+//           await bulkInsertData(dataToInsert, linkDetailsToInsert);
+//           dataToInsert.length = 0; // Clear batch
+//           linkDetailsToInsert.length = 0;
+//         }
+//       } catch (error) {
+//         console.error('Error processing row:', error.message);
+//         // Continue processing other rows
 //       }
-  
-//       // Add pagination and region order
-//       query += `
-//         ORDER BY 
-//           FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
-//         LIMIT ? OFFSET ?;
-//       `;
-//       params.push(parseInt(limit), parseInt(offset));
-  
-//       // Execute the query
-//       const result = await executeQuery(query, params);
-  
-//       // Send the response with the data
-//       res.status(200).json({
-//         success: true,
-//         message: 'Data fetched successfully',
-//         data: result,
-//         page: parseInt(page),
-//         limit: parseInt(limit),
-//       });
-//     } catch (error) {
-//       console.error('Error fetching dealer details:', error);
-//       res.status(500).json({
-//         success: false,
-//         message: 'Internal Server Error',
-//         error: error.message,
-//       });
 //     }
 //   };
-  
 
+//   const generateUniqueShortUrl = async (tableName, url_side) => {
+//     let short_url;
+//     let isUnique = false;
 
-exports.getDealerDetailsRegion = async (req, res) => {
-  const { date, time } = getCurrentDateTime();
-  const days_add = addDaysToDate(date);
-  const filePath = path.join(__dirname, '../upload/PDSA_202411170603011.csv'); // Ensure dynamic file path handling.
+//     while (!isUnique) {
+//       const uniqueId = generateUniqueId(10);
+//       short_url = `${url_side}/${uniqueId}`;
 
-  // Ensure the file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({
-      success: false,
-      message: 'File not found.',
-    });
-  }
+//       // Check if the short URL is unique
+//       const checkQuery = `SELECT COUNT(*) AS count FROM ${tableName} WHERE short_url = ?`;
+//       const [result] = await executeQuery(checkQuery, [short_url]);
 
-  const batchSize = 50; // Process 50 rows at a time
+//       if (result.count === 0) {
+//         isUnique = true;
+//       }
+//     }
+//     return short_url;
+//   };
 
-  const processCsvFile = async () => {
-    const dataToInsert = [];
-    const linkDetailsToInsert = [];
-    const rows = []; // Store rows for sequential processing
+//   const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
+//     try {
+//       // Start database transaction
+//       await executeQuery('START TRANSACTION');
 
-    // Read and parse CSV
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csvParser())
-        .on('data', (row) => {
-          rows.push(row); // Store row for later processing
-        })
-        .on('end', resolve)
-        .on('error', reject);
-    });
+//       // Bulk insert data into `link_details`
+//       if (linkDetailsToInsert.length > 0) {
+//         const insertQueryLinkDetails = `
+//           INSERT INTO link_details (
+//             unique_id,
+//             org_url,
+//             short_url,
+//             create_date,
+//             create_time,
+//             created_by,
+//             validity_date,
+//             validity_days,
+//             status
+//           ) VALUES ?`;
+//         await executeQuery(insertQueryLinkDetails, [linkDetailsToInsert]);
+//       }
 
-    for (let i = 0; i < rows.length; i++) {
-      try {
-        const row = rows[i];
-        const fullName = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
-        const admin_id = 'manthanadmin';
-        const user_id = 'isly_honda';
-        const final_message = 'final_message';
-        const status = '1';
-       
-        const vedio_url = process.env.LINKVEDIOLINK;
-        const url_side = process.env.URL_SERVER;
+//       // Bulk insert data into `honda_url_data`
+//       if (dataToInsert.length > 0) {
+//         const insertQueryHondaData = `
+//           INSERT INTO honda_url_data (
+//             cust_name,
+//             mobile,
+//             frame_no,
+//             dealer_code,
+//             model_name,
+//             admin_id,
+//             user_id,
+//             feedback_url,
+//             feedback_short_url,
+//             final_message,
+//             status,
+//             vedio_url,
+//             vedio_short_url,
+//             cdate,
+//             ctime
+//           ) VALUES ?`;
+//         await executeQuery(insertQueryHondaData, [dataToInsert]);
+//       }
 
-        // Generate unique short URLs
-        const feedback_short_url = await generateUniqueShortUrl('link_details', url_side);
-        const vedio_short_url = await generateUniqueShortUrl('link_details', url_side);
- const feedback_url = `http://192.168.0.122:3000/feedback?id=${feedback_short_url}`
-        // Prepare data for bulk insertion
-        dataToInsert.push([
-          fullName,
-          row['Customer mobile number'],
-          row['Frame No'],
-          row['Dealer_Code'],
-          row['MODEL_NAME'],
-          admin_id,
-          user_id,
-          feedback_url,
-          feedback_short_url,
-          final_message,
-          status,
-          vedio_url,
-          vedio_short_url,
-          date,
-          time,
-        ]);
+//       // Commit the transaction
+//       await executeQuery('COMMIT');
+//     } catch (error) {
+//       console.error('Error in bulk insert:', error.message);
+//       await executeQuery('ROLLBACK');
+//       throw error;
+//     }
+//   };
 
-        linkDetailsToInsert.push([
-          generateUniqueId(10), // Unique ID for this record
-          feedback_url,
-          feedback_short_url,
-          days_add,
-          time,
-          admin_id,
-          days_add, // Validity date
-          15, // Validity days
-          '1',
-        ]);
+//   try {
+//     // Process the CSV file asynchronously
+//     await processCsvFile();
 
-        // Insert batch when the size is reached or it's the last row
-        if (dataToInsert.length >= batchSize || i === rows.length - 1) {
-          await bulkInsertData(dataToInsert, linkDetailsToInsert);
-          dataToInsert.length = 0; // Clear batch
-          linkDetailsToInsert.length = 0;
-        }
-      } catch (error) {
-        console.error('Error processing row:', error.message);
-        // Continue processing other rows
-      }
-    }
-  };
-
-  const generateUniqueShortUrl = async (tableName, url_side) => {
-    let short_url;
-    let isUnique = false;
-
-    while (!isUnique) {
-      const uniqueId = generateUniqueId(10);
-      short_url = `${url_side}/${uniqueId}`;
-
-      // Check if the short URL is unique
-      const checkQuery = `SELECT COUNT(*) AS count FROM ${tableName} WHERE short_url = ?`;
-      const [result] = await executeQuery(checkQuery, [short_url]);
-
-      if (result.count === 0) {
-        isUnique = true;
-      }
-    }
-    return short_url;
-  };
-
-  const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
-    try {
-      // Start database transaction
-      await executeQuery('START TRANSACTION');
-
-      // Bulk insert data into `link_details`
-      if (linkDetailsToInsert.length > 0) {
-        const insertQueryLinkDetails = `
-          INSERT INTO link_details (
-            unique_id,
-            org_url,
-            short_url,
-            create_date,
-            create_time,
-            created_by,
-            validity_date,
-            validity_days,
-            status
-          ) VALUES ?`;
-        await executeQuery(insertQueryLinkDetails, [linkDetailsToInsert]);
-      }
-
-      // Bulk insert data into `honda_url_data`
-      if (dataToInsert.length > 0) {
-        const insertQueryHondaData = `
-          INSERT INTO honda_url_data (
-            cust_name,
-            mobile,
-            frame_no,
-            dealer_code,
-            model_name,
-            admin_id,
-            user_id,
-            feedback_url,
-            feedback_short_url,
-            final_message,
-            status,
-            vedio_url,
-            vedio_short_url,
-            cdate,
-            ctime
-          ) VALUES ?`;
-        await executeQuery(insertQueryHondaData, [dataToInsert]);
-      }
-
-      // Commit the transaction
-      await executeQuery('COMMIT');
-    } catch (error) {
-      console.error('Error in bulk insert:', error.message);
-      await executeQuery('ROLLBACK');
-      throw error;
-    }
-  };
-
-  try {
-    // Process the CSV file asynchronously
-    await processCsvFile();
-
-    res.status(200).json({
-      success: true,
-      message: 'All data inserted successfully.',
-    });
-  } catch (error) {
-    console.error('Error processing the file:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Internal Server Error.',
-      error: error.message,
-    });
-  }
-};
+//     res.status(200).json({
+//       success: true,
+//       message: 'All data inserted successfully.',
+//     });
+//   } catch (error) {
+//     console.error('Error processing the file:', error.message);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Internal Server Error.',
+//       error: error.message,
+//     });
+//   }
+// };
 
   
   

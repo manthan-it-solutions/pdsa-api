@@ -42,7 +42,7 @@ app.use('/user', userroutes);
 
 
 
-// app.post('/api/log-404', async (req, res) => {
+// app.use( async (req, res,next) => {
 //   try {
 //     const { url: url_client, latitude, longitude, city, state, country } = req.body;
     
@@ -129,18 +129,14 @@ app.use('/user', userroutes);
 //         time,
 //         unique_id,
 //       ]);
-
+//       window.location.href=orgUrl
 //       // Send the original URL and unique ID back to the client
 //       res.status(200).send({ success: '200', orgUrl, unique_id });
 //     } else {
 //       // URL not found; respond with error and metadata
 //       res.status(404).json({
 //         message: 'URL not found',
-//         clientIp,
-//         url_client,
-//         latitude: latitude || geo.ll[0],
-//         longitude: longitude || geo.ll[1],
-//         unique_id,
+    
 //       });
 //     }
 //   } catch (error) {
@@ -149,47 +145,59 @@ app.use('/user', userroutes);
 //   }
 // });
 
-  
-
-// Error handling middleware
 
 
 
-app.post('/api/log-404', async (req, res) => {
-
-  console.log('111111111');
+app.use(async (req, res, next) => {
   try {
-    const { url: url_client, latitude, longitude, city, state, country } = req.body;
-    const url_side = process.env.URL_SERVER;
-
-    // Construct the unique ID for the short URL
-    const unique_id = `${url_side}${url_client}`;
-    console.log('Unique ID:', unique_id);
-
-    // Get client IP address
+    // Get the client IP address
     let clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log('Raw Client IP Address: ', clientIp);
+
+    // Check if the IP is IPv4-mapped IPv6 and extract IPv4
     if (clientIp.startsWith('::ffff:')) {
       clientIp = clientIp.replace('::ffff:', '');
     }
 
-    // Fetch geolocation data using geoip-lite or fallback to external API
+    // Get latitude/longitude based on IP using geoip-lite
     let geo = geoip.lookup(clientIp);
+    console.log('geo: ', geo);
+
     if (!geo || !geo.ll) {
+      console.log('IP not found in geoip-lite, using external API...');
+
+      // Fallback to an external API if geoip-lite fails
       try {
         const response = await axios.get(`http://ip-api.com/json/${clientIp}`);
         const data = response.data;
 
-        geo = data.status === 'success' ? { ll: [data.lat, data.lon] } : { ll: ['Unknown', 'Unknown'] };
+        if (data.status === 'success') {
+          geo = {
+            ll: [data.lat, data.lon],
+            city: data.city,
+            state: data.regionName,
+            country: data.country,
+          };
+        } else {
+          console.log('External API failed to provide geolocation.');
+          geo = { ll: ['Unknown', 'Unknown'], city: 'Unknown', state: 'Unknown', country: 'Unknown' };
+        }
       } catch (error) {
         console.error('Error fetching geolocation from external API:', error);
-        geo = { ll: ['Unknown', 'Unknown'] };
+        geo = { ll: ['Unknown', 'Unknown'], city: 'Unknown', state: 'Unknown', country: 'Unknown' };
       }
     }
 
-    // Get the current date and time
-    const { date, time } = getCurrentDateTime();
+    const { ll: [latitude, longitude], city, state, country } = geo;
+    console.log(`Geo location: Latitude: ${latitude}, Longitude: ${longitude}`);
 
-    // Query to fetch the original URL and determine its type
+
+  
+
+    const id = req.originalUrl
+      const unique_id  = `http://192.168.0.122:8080${id}`
+
+    // Prepare SELECT query to fetch original URL
     const qrySelect = `
       SELECT 
         CASE 
@@ -203,18 +211,18 @@ app.post('/api/log-404', async (req, res) => {
       FROM 
         honda_url_data
       WHERE 
-        feedback_short_url = ? OR 
-        vedio_short_url = ?;
+        feedback_short_url = ? OR vedio_short_url = ?;
     `;
 
     // Execute SELECT query
     const selectResult = await executeQuery(qrySelect, [unique_id, unique_id, unique_id, unique_id]);
-    console.log('Select Query Result:', selectResult);
+    console.log('unique_id: ', unique_id);
 
     if (selectResult.length > 0) {
-      // Extract `org_url` and `url_type` from the query result
       const { org_url, url_type } = selectResult[0];
-    
+      const currentDateTime = new Date();
+      const date = currentDateTime.toISOString().split('T')[0]; // yyyy-mm-dd
+      const time = currentDateTime.toTimeString().split(' ')[0]; // hh:mm:ss
 
       // Construct the UPDATE query dynamically based on `url_type`
       const qryUpdateVisitCount = `
@@ -228,34 +236,39 @@ app.post('/api/log-404', async (req, res) => {
         WHERE ${url_type === 'feedback' ? 'feedback_short_url' : 'vedio_short_url'} = ?
       `;
 
-      // Execute UPDATE query
+      // Increment visit count and update metadata
       await executeQuery(qryUpdateVisitCount, [
-        city || geo.ll[0],         // City or fallback geolocation
-        state || geo.ll[1],        // State or fallback geolocation
-        country || 'Unknown',      // Country or 'Unknown'
-        date,                      // Current date
-        time,                      // Current time
-        unique_id,                 // Unique short URL
+        city || 'Unknown',
+        state || 'Unknown',
+        country || 'Unknown',
+        date,
+        time,
+        unique_id,
       ]);
 
-      // Respond with the original URL and unique ID
-      res.status(200).send({ success: '200', orgUrl: org_url, unique_id,url_type });
+      // Redirect the client to the original URL
+      res.redirect(org_url);
     } else {
-      // If no matching URL found, return 404 with metadata
-      res.status(404).json({
-        message: 'URL not found',
-        clientIp,
-        url_client,
-        latitude: latitude || geo.ll[0],
-        longitude: longitude || geo.ll[1],
-        unique_id,
-      });
+      // URL not found
+      res.status(404).json({ message: 'URL not found' });
     }
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).send('Internal Server Error');
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+
+
+
+
+
+  
+
+
+
+
+
 
 
 app.use(errorMiddleware);
