@@ -216,7 +216,7 @@ app.use(async (req, res, next) => {
 
     // Execute SELECT query
     const selectResult = await executeQuery(qrySelect, [unique_id, unique_id, unique_id, unique_id]);
-    console.log('unique_id: ', unique_id);
+    
 
     if (selectResult.length > 0) {
       const { org_url, url_type } = selectResult[0];
