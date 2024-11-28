@@ -357,6 +357,108 @@ WHERE
     }
 }
 
+exports.getUserDetailsRegion = async (req, res) => {
+    const userId = req.user.user_id; // Assuming middleware provides authenticated user info
+    console.log('userId:', userId);
+
+    try {
+        console.log('req.body:', req.body);
+
+        // Step 1: Get region for the user
+        const [regionResult] = await executeQuery(
+            `SELECT region_name FROM crediantial_tbl WHERE user_id = ?`,
+            [userId]
+        );
+
+        if (!regionResult || !regionResult.region_name) {
+            return res.status(404).json({ message: 'Region not found for user' });
+        }
+
+        const columnName = req.body.columnName;
+        const userRegion = regionResult.region_name;
+
+        // Define queries for specific metrics
+        const metricFilters = {
+            video_send_count: `
+                hu.v_c_date IS NOT NULL 
+            `,
+            video_click_count: `
+                hu.data_type = 'Video' AND hu.v_click_date IS NOT NULL AND hu.v_click_date != ''
+            `,
+            total_feedback_click_count: `
+                hu.f_click_date IS NOT NULL AND hu.f_click_date != ''
+            `,
+            feedback_sms_video_count: `
+                hu.click_date IS NOT NULL AND hu.feedback_date != ''
+            `,
+        };
+
+        const dealerDetailsQuery = `
+            SELECT 
+                dm.region AS region,    
+                hu.dealer_code,
+                hu.cdate,
+                hu.ctime,
+                hu.v_c_date,
+                hu.v_click_date,
+                hu.click_date,
+                hu.feedback_date,
+                dm.main_dealer,
+                dm.dealer_name,
+                dm.dealer_type,
+                dm.dealer_code AS Dealer_code,
+                dm.region AS Dealer_region,
+                dm.state AS Dealer_State,
+                dm.city AS Dealer_City,
+                hu.model_name,
+                hu.feedback_answer1,
+                hu.feedback_answer2,
+                hu.feedback_answer3,
+                hu.feedback_answer4,
+                hu.feedback_answer5,
+                hu.feedback_date,
+                hu.feedback_time
+            FROM 
+                dealer_master dm
+            LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+            WHERE 
+                dm.region = ? 
+                AND ${metricFilters[columnName]} -- Filter rows based on the metric
+            ORDER BY 
+                FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+        `;
+
+        // Validate the columnName
+        if (!metricFilters[columnName]) {
+            return res.status(400).json({ message: 'Invalid columnName provided' });
+        }
+
+        // Step 2: Execute the dealer details query filtered by the selected metric
+        const dealerDetailsResult = await executeQuery(dealerDetailsQuery, [userRegion]);
+
+        // Step 3: Count rows for the selected metric
+        const metricCountQuery = `
+            SELECT COUNT(*) AS ${columnName}
+            FROM honda_url_data hu
+            WHERE hu.dealer_code IN 
+                (SELECT dealer_code FROM dealer_master WHERE region = ?) 
+            AND ${metricFilters[columnName]};
+            `;
+        const [metricCountResult] = await executeQuery(metricCountQuery, [userRegion]);
+        console.log('metricCountResult:', [metricCountResult])
+        // Step 4: Add the metric count to each dealer detail row
+        const combinedResult = dealerDetailsResult.map(dealer => ({
+            ...dealer,
+            [columnName]: metricCountResult ? metricCountResult[columnName] : 0,
+        }));    
+        // console.log('metricCountResult', metricCountResult.length)
+        console.log('combinedResult:', combinedResult.length)
+        res.status(200).json({ success: '200', data: combinedResult });
+    } catch (error) {
+        console.error('Error fetching region data:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
 
 
 
