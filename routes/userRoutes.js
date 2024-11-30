@@ -22,14 +22,18 @@ router.get('/getURL_data_user' , authMiddleware , userController.getURL_data_use
 router.get('/get_dashboard_data_user' , authMiddleware , userController.get_dashboard_data_user)
 
 
-router.post('/select_user_details_by_link' , authMiddleware , userController.select_user_details_by_user_id)
+router.post('/select_user_details_by_link'  , userController.select_user_details_by_user_id)
 
 
 
-router.post('/submit_feedback' , authMiddleware , userController.submit_feedback)
+router.post('/submit_feedback'  , userController.submit_feedback)
 
 
 router.post('/getUserDetailsRegion' , authMiddleware ,userController.getUserDetailsRegion)
+
+
+
+router.post('/getUserDetailsZone' , authMiddleware ,userController.getUserDetailsZone)
 
 
 

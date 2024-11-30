@@ -413,7 +413,7 @@ exports.ClickDataGet = async (req, res) => {
                 (SELECT COUNT(*) 
                  FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE region = dm.region) 
-                 AND hu.data_type = 'Video'
+                
                  AND hu.v_click_date IS NOT NULL
                  AND MONTH(hu.v_click_date) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.v_click_date) = YEAR(CURRENT_DATE())) AS video_click_count,
@@ -457,6 +457,7 @@ exports.ClickDataGet = async (req, res) => {
 
         // Execute the query with pagination using numbers, not strings
         const result = await executeQuery(query, [parseInt(limit), parseInt(offset)]);
+       
 
         // Send the response
         res.status(200).send({
@@ -504,7 +505,7 @@ exports.getURL_data_zone = async (req, res) => {
                 (SELECT COUNT(*) 
                  FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
-                 AND hu.data_type = 'Video'
+               
                  AND hu.v_click_date IS NOT NULL
                  AND MONTH(hu.v_click_date) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.v_click_date) = YEAR(CURRENT_DATE())) AS video_click_count,
@@ -654,93 +655,204 @@ SELECT
 
 
 
-
-
-
   exports.getDealerDetailsZone = async (req, res) => {
     try {
-      // Get zone and pagination params from the request body
-      const zone = req.body.zone;  // Zone parameter to filter
-      const { page = 1, limit = 10 } = req.body;  // Default pagination values
-      const offset = (page - 1) * limit;
-  
-      // Construct the SQL query with conditional zone filter
-      let query = `
-        SELECT 
-          dm.zone AS zone,
-    
-          -- Count of video links for the current zone
-          (SELECT COUNT(*) 
-           FROM honda_url_data hu 
-           WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
-           AND hu.cdate IS NOT NULL
-           AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
-           AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
-    
-          -- Dealer details (individual dealer data) for this zone
-          hu.dealer_code,
-          hu.cdate,
-          hu.ctime,
-          hu.v_c_date,
-          hu.v_click_date,
-          hu.click_date,
-          hu.feedback_date,
-          dm.main_dealer,
-          dm.dealer_name,
-          dm.dealer_type,
-          dm.dealer_code AS Dealer_code,
-          dm.zone AS Dealer_Zone,
-          dm.state AS Dealer_State,
-          dm.city AS Dealer_City,
-          hu.model_name,
-          hu.feedback_answer1,
-          hu.feedback_answer2,
-          hu.feedback_answer3,
-          hu.feedback_answer4,
-          hu.feedback_answer5,
-          hu.feedback_date,
-          hu.feedback_time
-    
-        FROM 
-          dealer_master dm
-        LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
-        WHERE 
-          hu.cdate IS NOT NULL
-          AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
-          AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())`;
-  
-      // Add zone condition if a zone is provided
-      if (zone) {
-        query += ` AND dm.zone = ?`;  // Filter by the provided zone
-      }
-  
-      // Add pagination and order by zone
-      query += `
-        ORDER BY 
-          FIELD(dm.zone, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
-        LIMIT ? OFFSET ?;
-      `;
-  
-      // Execute the query with pagination and zone filter (if applicable)
-      const result = await executeQuery(query, zone ? [zone, parseInt(limit), parseInt(offset)] : [parseInt(limit), parseInt(offset)]);
-  
-      // Send the response with the data
-      res.status(200).json({
-        success: true,
-        message: 'Data fetched successfully',
-        data: result,
-        page: parseInt(page),
-        limit: parseInt(limit),
-      });
+        // Extract parameters from the request body
+        const { zone, columnName, page = 1, limit = 10 } = req.body;
+        const offset = (page - 1) * limit;
+
+        // Define the filter conditions for each column
+        const metricFilters = {
+            video_send_count: `hu.v_c_date IS NOT NULL`,
+            video_click_count: ` hu.v_click_date IS NOT NULL AND hu.v_click_date != ''`,
+            total_feedback_click_count: `hu.f_click_date IS NOT NULL AND hu.f_click_date != ''`,
+            feedback_sms_video_count: `hu.click_date IS NOT NULL AND hu.feedback_date != ''`,
+        };
+
+        // Validate the columnName
+        if (!metricFilters[columnName]) {
+            return res.status(400).json({ success: false, message: 'Invalid columnName provided' });
+        }
+
+        if (zone === 'total') {
+            // Construct the SQL query for total aggregation across all zones
+            let query = `
+                SELECT 
+                    dm.zone AS zone,
+                    hu.dealer_code,
+                    hu.cdate,
+                    hu.ctime,
+                    hu.v_c_date,
+                    hu.v_click_date,
+                    hu.click_date,
+                    hu.feedback_date,
+                    dm.main_dealer,
+                    dm.dealer_name,
+                    dm.dealer_type,
+                    dm.dealer_code AS Dealer_code,
+                    dm.region AS Dealer_region,
+                    dm.state AS Dealer_State,
+                    dm.city AS Dealer_City,
+                    hu.model_name,
+                    hu.feedback_answer1,
+                    hu.feedback_answer2,
+                    hu.feedback_answer3,
+                    hu.feedback_answer4,
+                    hu.feedback_answer5,
+                    hu.feedback_date,
+                    hu.feedback_time
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                    AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                    AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())
+            `;
+            
+            // Execute the query to fetch dealer details without zone filtering
+            const dealerDetailsResult11111 = await executeQuery(query, []);
+            
+            // Add pagination and order by region
+            query += `
+                ORDER BY 
+                    FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                LIMIT ? OFFSET ?;
+            `;
+            
+            const queryParams = [parseInt(limit), parseInt(offset)];
+            const dealerDetailsResult = await executeQuery(query, queryParams);
+
+            // Get the total count of dealers (without pagination)
+            let totalCountQuery = `
+                SELECT COUNT(DISTINCT dm.dealer_code) AS totalItems
+                FROM dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                    AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                    AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())
+            `;
+            
+            const [totalCountResult] = await executeQuery(totalCountQuery, []);
+            const totalItems = totalCountResult[0]?.totalItems || 0;
+
+            // Combine the metric count with the dealer details
+            const combinedResult = dealerDetailsResult.map(dealer => ({
+                ...dealer,
+                [columnName]: dealer[columnName] || 0, // Set metric count for each dealer
+            }));
+
+            // Send the response with total items for pagination
+            res.status(200).json({
+                success: true,
+                message: 'Data fetched successfully',
+                data: combinedResult,
+                count_total: dealerDetailsResult11111.length,  // Total number of records
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(totalItems / limit),  // Calculate total pages
+            });
+        } else {
+            // Construct the SQL query for a specific zone
+            let query = `
+                SELECT 
+                    dm.zone AS zone,
+                    hu.dealer_code,
+                    hu.cdate,
+                    hu.ctime,
+                    hu.v_c_date,
+                    hu.v_click_date,
+                    hu.click_date,
+                    hu.feedback_date,
+                    dm.main_dealer,
+                    dm.dealer_name,
+                    dm.dealer_type,
+                    dm.dealer_code AS Dealer_code,
+                    dm.region AS Dealer_region,
+                    dm.state AS Dealer_State,
+                    dm.city AS Dealer_City,
+                    hu.model_name,
+                    hu.feedback_answer1,
+                    hu.feedback_answer2,
+                    hu.feedback_answer3,
+                    hu.feedback_answer4,
+                    hu.feedback_answer5,
+                    hu.feedback_date,
+                    hu.feedback_time
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                    AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                    AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())
+            `;
+            
+            // Add zone condition if provided
+            query += ` AND dm.zone = ?`;
+
+            const dealerDetailsResult11111 = await executeQuery(query, [zone]);
+            
+            // Add pagination and order by region
+            query += `
+                ORDER BY 
+                    FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                LIMIT ? OFFSET ?;
+            `;
+
+            const queryParams = [zone, parseInt(limit), parseInt(offset)];
+            const dealerDetailsResult = await executeQuery(query, queryParams);
+
+            // Construct the query to get the total count of dealers (without pagination)
+            let totalCountQuery = `
+                SELECT COUNT(DISTINCT dm.dealer_code) AS totalItems
+                FROM dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                    AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
+                    AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())
+            `;
+
+            // Add zone condition for total count query
+            totalCountQuery += ` AND dm.zone = ?`;
+
+            // Execute the query to get the total count of records (total number of dealers)
+            const [totalCountResult] = await executeQuery(totalCountQuery, [zone]);
+            const totalItems = totalCountResult[0]?.totalItems || 0;
+
+            // Combine the metric count with the dealer details
+            const combinedResult = dealerDetailsResult.map(dealer => ({
+                ...dealer,
+                [columnName]: dealer[columnName] || 0,
+            }));
+
+            // Send the response with total items for pagination
+            res.status(200).json({
+                success: true,
+                message: 'Data fetched successfully',
+                data: combinedResult,
+                count_total: dealerDetailsResult11111.length,  // Total number of records
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(totalItems / limit),  // Calculate total pages
+            });
+        }
     } catch (error) {
-      console.error('Error fetching dealer details:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal Server Error',
-        error: error.message,
-      });
+        console.error('Error fetching dealer details:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal Server Error',
+            error: error.message,
+        });
     }
-  };
+};
+
+
+  
+
+
 
 
 
@@ -835,79 +947,180 @@ SELECT
   // };
   
 
-
-
   exports.getDealerDetailsRegion = async (req, res) => {
     try {
-        console.log('req.body:', req.body);
+        const { columnName, region } = req.body;
 
-        const columnName = req.body.columnName;
+        console.log('Region:', region);
+        console.log('Column Name:', columnName);
 
-        // Define queries for specific metrics
+        // Define filters for specific metrics
         const metricFilters = {
             video_send_count: `hu.v_c_date IS NOT NULL`,
-            video_click_count: `hu.data_type = 'Video' AND hu.v_click_date IS NOT NULL AND hu.v_click_date != ''`,
+            video_click_count: `hu.v_click_date IS NOT NULL AND hu.v_click_date != ''`,
             total_feedback_click_count: `hu.f_click_date IS NOT NULL AND hu.f_click_date != ''`,
             feedback_sms_video_count: `hu.click_date IS NOT NULL AND hu.feedback_date != ''`,
         };
 
+        // Validate columnName
         if (!metricFilters[columnName]) {
             return res.status(400).json({ message: 'Invalid columnName provided' });
         }
 
-        const dealerDetailsQuery = `
-            SELECT 
-                dm.region AS region,    
-                hu.dealer_code,
-                hu.cdate,
-                hu.ctime,
-                hu.v_c_date,
-                hu.v_click_date,
-                hu.click_date,
-                hu.feedback_date,
-                dm.main_dealer,
-                dm.dealer_name,
-                dm.dealer_type,
-                dm.dealer_code AS Dealer_code,
-                dm.region AS Dealer_region,
-                dm.state AS Dealer_State,
-                dm.city AS Dealer_City,
-                hu.model_name,
-                hu.feedback_answer1,
-                hu.feedback_answer2,
-                hu.feedback_answer3,
-                hu.feedback_answer4,
-                hu.feedback_answer5,
-                hu.feedback_date,
-                hu.feedback_time
-            FROM 
-                dealer_master dm
-            LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
-            WHERE 
-                ${metricFilters[columnName]} 
-            ORDER BY 
-                FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
-        `;
+        // Validate region
+        if (!region) {
+            return res.status(400).json({ message: 'Region is required' });
+        }
 
-        const dealerDetailsResult = await executeQuery(dealerDetailsQuery);
+        if (region === "total") {
+            // Query to fetch region-wise counts
+            const totalRegionQuery = `
+                SELECT 
+                    dm.region AS region,
+                    COUNT(*) AS ${columnName}
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                GROUP BY 
+                    dm.region
+                ORDER BY 
+                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+            `;
+        
+            // Execute query for total region
+            const totalRegionResult = await executeQuery(totalRegionQuery);
+        
+            // Fetch dealer details for all regions
+            const dealerDetailsQuery = `
+                SELECT 
+                    dm.region AS region,
+                    hu.dealer_code,
+                    hu.cdate,
+                    hu.ctime,
+                    hu.v_c_date,
+                    hu.v_click_date,
+                    hu.click_date,
+                    hu.feedback_date,
+                    dm.main_dealer,
+                    dm.dealer_name,
+                    dm.dealer_type,
+                    dm.dealer_code AS Dealer_code,
+                    dm.region AS Dealer_region,
+                    dm.state AS Dealer_State,
+                    dm.city AS Dealer_City,
+                    hu.model_name,
+                    hu.feedback_answer1,
+                    hu.feedback_answer2,
+                    hu.feedback_answer3,
+                    hu.feedback_answer4,
+                    hu.feedback_answer5,
+                    hu.feedback_date,
+                    hu.feedback_time
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                ORDER BY 
+                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+            `;
+        
+            const dealerDetailsResult = await executeQuery(dealerDetailsQuery);
+        
+            // Convert RowDataPacket to plain JavaScript objects
+            const dealersInRegion = dealerDetailsResult.map(dealer => {
+                return JSON.parse(JSON.stringify(dealer)); // Convert to plain JavaScript object
+            });
+        
+            // Combine dealer details with region-wise metrics
+            const combinedResult = totalRegionResult.map(regionData => {
+                const dealersInRegionForRegion = dealersInRegion.filter(
+                    dealer => dealer.region === regionData.region
+                );
+        
+                return {
+                    region: regionData.region,
+                    [columnName]: regionData[columnName],
+                    data: dealersInRegionForRegion, // Include dealer details
+                };
+            });
+        
+            // Merging all data into a single array
+            const mergedData = combinedResult.reduce((acc, regionData) => {
+                return acc.concat(regionData.data); // Concatenate all 'data' arrays into one
+            }, []);
+        
+            // Log the merged data for debugging
+            console.log(JSON.stringify(mergedData, null, 2), 'mergedData'); // Pretty print merged data
+        
+            // Send the merged data in the response
+            return res.status(200).json({ success: '200', data: mergedData });
+        }
+        
+        
+         else {
+            // For a specific region
+            console.log('Fetching data for region:', region);
 
-        const metricCountQuery = `
-            SELECT COUNT(*) AS ${columnName}
-            FROM honda_url_data hu
-            WHERE hu.dealer_code IN 
-                (SELECT dealer_code FROM dealer_master) 
-                AND ${metricFilters[columnName]};
-        `;
+            const dealerDetailsQuery = `
+                SELECT 
+                    dm.region AS region,    
+                    hu.dealer_code,
+                    hu.cdate,
+                    hu.ctime,
+                    hu.v_c_date,
+                    hu.v_click_date,
+                    hu.click_date,
+                    hu.feedback_date,
+                    dm.main_dealer,
+                    dm.dealer_name,
+                    dm.dealer_type,
+                    dm.dealer_code AS Dealer_code,
+                    dm.region AS Dealer_region,
+                    dm.state AS Dealer_State,
+                    dm.city AS Dealer_City,
+                    hu.model_name,
+                    hu.feedback_answer1,
+                    hu.feedback_answer2,
+                    hu.feedback_answer3,
+                    hu.feedback_answer4,
+                    hu.feedback_answer5,
+                    hu.feedback_date,
+                    hu.feedback_time
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]} 
+                    AND dm.region = ?  -- Filter by region
+                ORDER BY 
+                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+            `;
 
-        const [metricCountResult] = await executeQuery(metricCountQuery);
+            const dealerDetailsResult = await executeQuery(dealerDetailsQuery, [region]);
 
-        const combinedResult = dealerDetailsResult.map(dealer => ({
-            ...dealer,
-            [columnName]: metricCountResult ? metricCountResult[columnName] : 0,
-        }));
+            const metricCountQuery = `
+                SELECT COUNT(*) AS ${columnName}
+                FROM honda_url_data hu
+                WHERE hu.dealer_code IN 
+                    (SELECT dealer_code FROM dealer_master WHERE region = ?) 
+                    AND ${metricFilters[columnName]};
+            `;
 
-        console.log('combinedResult:', combinedResult.length);
-        res.status(200).json({ success: '200', data: combinedResult });
+            const [metricCountResult] = await executeQuery(metricCountQuery, [region]);
+
+            // Combine dealer details with the count
+            const combinedResult = dealerDetailsResult.map(dealer => ({
+                ...dealer,
+                [columnName]: metricCountResult ? metricCountResult[columnName] : 0,
+            }));
+
+            console.log(combinedResult,'combinedResultcombinedResult');
+
+            return res.status(200).json({ success: '200', data: combinedResult });
+        }
     } catch (error) {
         console.error('Error fetching region data:', error);
         res.status(500).json({ message: 'Internal server error' });
@@ -919,10 +1132,14 @@ SELECT
 
 
 
+
+
+
+
 // exports.getDealerDetailsRegion = async (req, res) => {
 //   const { date, time } = getCurrentDateTime();
 //   const days_add = addDaysToDate(date);
-//   const filePath = path.join(__dirname, '../upload/PDSA_202411170603011.csv'); // Ensure dynamic file path handling.
+//   const filePath = path.join(__dirname, '../upload/PDSA_2024111706030111.csv'); // Ensure dynamic file path handling.
 
 //   // Ensure the file exists
 //   if (!fs.existsSync(filePath)) {
@@ -966,7 +1183,7 @@ SELECT
 
 //         // Generate unique short URLs
 //         const feedback_short_url = await generateUniqueShortUrl('link_details', BACKEDURL);
-//         const vedio_short_url = await generateUniqueShortUrl('link_details', url_side);
+//         const vedio_short_url = await generateUniqueShortUrl('link_details', BACKEDURL);
 //  const feedback_url = `http://192.168.0.122:3000/feedback?id=${feedback_short_url}`
 //         // Prepare data for bulk insertion
 //         dataToInsert.push([
