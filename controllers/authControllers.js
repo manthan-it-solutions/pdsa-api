@@ -43,9 +43,9 @@ exports.logIn = async (req, res, next) => {
   }
 };
 
+
+
 exports.me = async (req, res, next) => {
-  
- 
   try {
     if (req.user) {
       res.json({
@@ -59,6 +59,9 @@ exports.me = async (req, res, next) => {
     return next(error);
   }
 };
+
+
+
 
 exports.query = async(req, res, next)=>{
   try {
