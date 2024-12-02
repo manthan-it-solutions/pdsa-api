@@ -42,7 +42,14 @@ router.get('/getURL_data',authMiddleware,adminMiddleware, adminController.ClickD
 
 
 
-router.get('/getURL_data_zone',authMiddleware,adminMiddleware, adminController.getURL_data_zone)
+
+
+
+
+
+
+
+router.post('/getURL_data_zone',authMiddleware,adminMiddleware, adminController.getURL_data_zone)
 
 
 
@@ -60,8 +67,16 @@ router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminCo
 
 
 
+
+
+
 // router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
 
+router.post('/Searh_button_api' , authMiddleware ,adminMiddleware, adminController.Searh_button_api)
+
+
+
+router.post('/Searh_button_api_region' , authMiddleware ,adminMiddleware, adminController.Searh_button_api_region)
 
 
 

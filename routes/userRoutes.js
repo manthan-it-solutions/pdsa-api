@@ -38,6 +38,17 @@ router.post('/getUserDetailsZone' , authMiddleware ,userController.getUserDetail
 
 
 
+router.post('/Searh_button_api_zone_user' , authMiddleware ,userController.Searh_button_api_zone_user)
+
+
+router.post('/Searh_button_api_region_user' , authMiddleware ,userController.Searh_button_api_region_user)
+
+
+
+
+
+
+
 
 
 module.exports = router
