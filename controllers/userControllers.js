@@ -545,6 +545,9 @@ exports.getUserDetailsRegion = async (req, res) => {
     const userRegion=   req.body.region
    
     const columnName = req.body.columnName;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
 
     const fromdate = req.body.fromdate
@@ -602,11 +605,57 @@ exports.getUserDetailsRegion = async (req, res) => {
                     AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
                       AND hu.cdate BETWEEN ? AND ? -- Add date range filter
                 ORDER BY 
-                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+                         LIMIT ${limit} OFFSET ${offset};
+                    ;
             `;
     
             const dealerDetailsResult = await executeQuery(dealerDetailsQuery, [userRegion, fromdate, todate]);
     
+
+       // Step 2: Execute the dealer details query filtered by the selected metric
+       const total = `
+       SELECT 
+           dm.region AS region,    
+           hu.dealer_code,
+           hu.cdate,
+           hu.ctime,
+           hu.v_c_date,
+           hu.v_click_date,
+           hu.click_date,
+           hu.feedback_date,
+           dm.main_dealer,
+           dm.dealer_name,
+           dm.dealer_type,
+           dm.dealer_code AS Dealer_code,
+           dm.region AS Dealer_region,
+           dm.state AS Dealer_State,
+           dm.city AS Dealer_City,
+           hu.model_name,
+           hu.feedback_answer1,
+           hu.feedback_answer2,
+           hu.feedback_answer3,
+           hu.feedback_answer4,
+           hu.feedback_answer5,
+           hu.feedback_date,
+           hu.feedback_time
+       FROM 
+           dealer_master dm
+       LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+       WHERE 
+           dm.region = ? 
+           AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
+       ORDER BY 
+           FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+               ;
+           ;
+   `;
+
+   const total11 = await executeQuery(total, [userRegion]);
+ 
+
+
+
             // Step 3: Function to calculate sum for individual metrics
             const getMetricCount = async (metric) => {
                 const metricSumQuery = `
@@ -644,7 +693,7 @@ exports.getUserDetailsRegion = async (req, res) => {
             }));
     
             console.log('combinedResult:', combinedResult.length);
-            res.status(200).json({ success: '200', data: combinedResult });
+            res.status(200).json({ success: '200', data: combinedResult ,total:total11.length });
         } catch (error) {
             console.error('Error fetching region data:', error);
             res.status(500).json({ message: 'Internal server error' });
@@ -718,12 +767,56 @@ console.log('222222');
                 WHERE 
                     ${metricFilters[columnName]}
                 ORDER BY 
-                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+                         LIMIT ${limit} OFFSET ${offset};
+                    ;
             `;
             
             // Execute the query for dealer details
             const dealerDetailsResult = await executeQuery(dealerDetailsQuery);
     
+       // Step 2: Execute the dealer details query filtered by the selected metric
+       const total = `
+       SELECT 
+                    dm.region AS region,
+                    hu.dealer_code,
+                    hu.cdate,
+                    hu.ctime,
+                    hu.v_c_date,
+                    hu.v_click_date,
+                    hu.click_date,
+                    hu.feedback_date,
+                    dm.main_dealer,
+                    dm.dealer_name,
+                    dm.dealer_type,
+                    dm.dealer_code AS Dealer_code,
+                    dm.region AS Dealer_region,
+                    dm.state AS Dealer_State,
+                    dm.city AS Dealer_City,
+                    hu.model_name,
+                    hu.feedback_answer1,
+                    hu.feedback_answer2,
+                    hu.feedback_answer3,
+                    hu.feedback_answer4,
+                    hu.feedback_answer5,
+                    hu.feedback_date,
+                    hu.feedback_time
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName]}
+                ORDER BY 
+                    FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+                         
+                    ;
+   `;
+
+   const total11 = await executeQuery(total, [userRegion]);
+ 
+
+
+
             // Convert RowDataPacket to plain JavaScript objects
             const dealersInRegion = dealerDetailsResult.map(dealer => {
                 return JSON.parse(JSON.stringify(dealer)); // Convert to plain JavaScript object
@@ -751,7 +844,7 @@ console.log('222222');
             console.log(JSON.stringify(mergedData, null, 2), 'mergedData'); // Pretty print merged data
     
             // Send the merged data in the response
-            return res.status(200).json({ success: '200', data: mergedData });
+            return res.status(200).json({ success: '200', data: mergedData ,total:total11.length });
     
         } catch (error) {
             console.error('Error fetching region data:', error);
@@ -768,12 +861,7 @@ console.log('22222222221111111111111');
     
          
 
-        // if (!regionResult || !regionResult.region_name) {
-        //     return res.status(404).json({ message: 'Region not found for user' });
-        // }
-      
-        // const userRegion = regionResult.region_name;
-        // Define queries for specific metrics
+        
         const metricFilters = {
             video_send_count: `
                 hu.v_c_date IS NOT NULL
@@ -827,10 +915,55 @@ console.log('22222222221111111111111');
                 dm.region = ? 
                 AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
             ORDER BY 
-                FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West');
+                FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+                     LIMIT ${limit} OFFSET ${offset};
+                ;
         `;
 
         const dealerDetailsResult = await executeQuery(dealerDetailsQuery, [userRegion]);
+      
+
+
+
+            // Step 2: Execute the dealer details query filtered by the selected metric
+            const total = `
+            SELECT 
+                dm.region AS region,    
+                hu.dealer_code,
+                hu.cdate,
+                hu.ctime,
+                hu.v_c_date,
+                hu.v_click_date,
+                hu.click_date,
+                hu.feedback_date,
+                dm.main_dealer,
+                dm.dealer_name,
+                dm.dealer_type,
+                dm.dealer_code AS Dealer_code,
+                dm.region AS Dealer_region,
+                dm.state AS Dealer_State,
+                dm.city AS Dealer_City,
+                hu.model_name,
+                hu.feedback_answer1,
+                hu.feedback_answer2,
+                hu.feedback_answer3,
+                hu.feedback_answer4,
+                hu.feedback_answer5,
+                hu.feedback_date,
+                hu.feedback_time
+            FROM 
+                dealer_master dm
+            LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+            WHERE 
+                dm.region = ? 
+                AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
+            ORDER BY 
+                FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
+                    ;
+                ;
+        `;
+
+        const total11 = await executeQuery(total, [userRegion]);
       
 
         // Step 3: Function to calculate sum for individual metrics
@@ -870,7 +1003,7 @@ console.log('22222222221111111111111');
         }));
         
         console.log('combinedResult:', combinedResult.length);
-        res.status(200).json({ success: '200', data: combinedResult });
+        res.status(200).json({ success: '200', data: combinedResult ,total:total11.length });
     } catch (error) {
         console.error('Error fetching region data:', error);
         res.status(500).json({ message: 'Internal server error' });
@@ -889,6 +1022,9 @@ exports.getUserDetailsZone = async (req, res) => {
     const userId = req.user.user_id;
     const userZone = req.body.zone
     const columnName = req.body.columnName;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
 
     const fromdate= req.body.fromdate
     console.log('fromdate: ', fromdate);
@@ -952,11 +1088,58 @@ exports.getUserDetailsZone = async (req, res) => {
                     AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
                     AND hu.cdate BETWEEN ? AND ? -- Add date range filter
                 ORDER BY
-                    FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi');
+                    FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                      LIMIT ${limit} OFFSET ${offset};
+                    ;
             `;
     
             const dealerDetailsResult = await executeQuery(dealerDetailsQuery, [userZone, fromdate, todate]);
     
+
+
+
+
+                 // Step 2: Execute the dealer details query filtered by the selected metric and date range
+                 const total = `
+                 SELECT 
+                     dm.zone AS zone,    
+                     hu.dealer_code,
+                     hu.cdate,
+                     hu.ctime,
+                     hu.v_c_date,
+                     hu.v_click_date,
+                     hu.click_date,
+                     hu.feedback_date,
+                     dm.main_dealer,
+                     dm.dealer_name,
+                     dm.dealer_type,
+                     dm.dealer_code AS Dealer_code,
+                     dm.zone AS Dealer_zone,
+                     dm.state AS Dealer_State,
+                     dm.city AS Dealer_City,
+                     hu.model_name,
+                     hu.feedback_answer1,
+                     hu.feedback_answer2,
+                     hu.feedback_answer3,
+                     hu.feedback_answer4,
+                     hu.feedback_answer5,
+                     hu.feedback_date,
+                     hu.feedback_time
+                 FROM 
+                     dealer_master dm
+                 LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                 WHERE 
+                     dm.zone = ? 
+                     AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
+                     AND hu.cdate BETWEEN ? AND ? -- Add date range filter
+                 ORDER BY
+                     FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                       LIMIT ${limit} OFFSET ${offset};
+                     ;
+             `;
+     
+             const total11 = await executeQuery(total, [userZone, fromdate, todate]);
+     
             // Step 3: Function to calculate sum for individual metrics with date range
             const getMetricCount = async (metric) => {
                 const metricSumQuery = `
@@ -983,7 +1166,7 @@ exports.getUserDetailsZone = async (req, res) => {
             }));
     
             console.log('combinedResult:', combinedResult);
-            res.status(200).json({ success: '200', data: combinedResult });
+            res.status(200).json({ success: '200', data: combinedResult   , total :total11.length});
         } catch (error) {
             console.error('Error fetching region data:', error);
             res.status(500).json({ message: 'Internal server error' });
@@ -1052,9 +1235,50 @@ exports.getUserDetailsZone = async (req, res) => {
                     ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
                 ORDER BY 
                     FIELD(dm.zone, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                      LIMIT ${limit} OFFSET ${offset};
             `;
             
             const dealerDetailsResult = await executeQuery(dealerDetailsQuery);
+
+
+
+            const total = `
+            SELECT 
+                    dm.zone AS zone,    
+                    hu.dealer_code,
+                    hu.cdate,
+                    hu.ctime,
+                    hu.v_c_date,
+                    hu.v_click_date,
+                    hu.click_date,
+                    hu.feedback_date,
+                    dm.main_dealer,
+                    dm.dealer_name,
+                    dm.dealer_type,
+                    dm.dealer_code AS Dealer_code,
+                    dm.zone AS Dealer_zone,
+                    dm.state AS Dealer_State,
+                    dm.city AS Dealer_City,
+                    hu.model_name,
+                    hu.feedback_answer1,
+                    hu.feedback_answer2,
+                    hu.feedback_answer3,
+                    hu.feedback_answer4,
+                    hu.feedback_answer5,
+                    hu.feedback_date,
+                    hu.feedback_time
+                FROM 
+                    dealer_master dm
+                LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+                WHERE 
+                    ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
+                ORDER BY 
+                    FIELD(dm.zone, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                  
+        `;
+    
+        const total11 = await executeQuery(total);
+    
     
             // Step 2: Function to calculate sum for individual metrics for all zones
             const getMetricCount = async (metric) => {
@@ -1087,7 +1311,7 @@ exports.getUserDetailsZone = async (req, res) => {
             });
     
  
-            res.status(200).json({ success: '200', data: combinedResult });
+            res.status(200).json({ success: '200', data: combinedResult , total :total11.length });
     
         } catch (error) {
             console.error('Error fetching zone data:', error);
@@ -1155,10 +1379,53 @@ console.log(columnName,11111)
             ORDER BY
 
                     FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                      LIMIT ${limit} OFFSET ${offset};
             ;
         `;
 
         const dealerDetailsResult = await executeQuery(dealerDetailsQuery, [userZone]);
+
+        const total = `
+        SELECT 
+            dm.zone AS zone,    
+            hu.dealer_code,
+            hu.cdate,
+            hu.ctime,
+            hu.v_c_date,
+            hu.v_click_date,
+            hu.click_date,
+            hu.feedback_date,
+            dm.main_dealer,
+            dm.dealer_name,
+            dm.dealer_type,
+            dm.dealer_code AS Dealer_code,
+            dm.zone AS Dealer_zone,
+            dm.state AS Dealer_State,
+            dm.city AS Dealer_City,
+            hu.model_name,
+            hu.feedback_answer1,
+            hu.feedback_answer2,
+            hu.feedback_answer3,
+            hu.feedback_answer4,
+            hu.feedback_answer5,
+            hu.feedback_date,
+            hu.feedback_time
+        FROM 
+            dealer_master dm
+        LEFT JOIN honda_url_data hu ON hu.dealer_code = dm.dealer_code
+        WHERE 
+            dm.zone = ? 
+            AND ${metricFilters[columnName] || '1=1'} -- Filter rows based on the metric
+        ORDER BY
+
+                FIELD(dm.region, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab', 'HP', 'JK', 'CH', 'Rajasthan', 'Jharkhand', 'Chhattisgarh', 'UP Central', 'Delhi')
+                  
+        ;
+    `;
+
+    const total11 = await executeQuery(total, [userZone]);
+
+
 
         // Step 3: Function to calculate sum for individual metrics
         const getMetricCount = async (metric) => {
@@ -1185,7 +1452,7 @@ console.log(columnName,11111)
         }));
 
         console.log('combinedResult:', combinedResult);
-        res.status(200).json({ success: '200', data: combinedResult });
+        res.status(200).json({ success: '200', data: combinedResult , total :total11.length});
     } catch (error) {
         console.error('Error fetching region data:', error);
         res.status(500).json({ message: 'Internal server error' });
