@@ -1183,7 +1183,7 @@ console.log('2222222222');
 
   exports.getDealerDetailsRegion = async (req, res) => {
 const fromdate = req.body.fromdate
-console.log('fromdate: ', fromdate);
+
 const todate = req.body.todate
 console.log('todate: ', todate);
 const page = parseInt(req.query.page) || 1;
@@ -1697,189 +1697,176 @@ console.log('2222222222');
 
 
 
-// exports.getDealerDetailsRegion = async (req, res) => {
-//   const { date, time } = getCurrentDateTime();
-//   const days_add = addDaysToDate(date);
-//   const filePath = path.join(__dirname, '../upload/PDSA_202411170603011.csv'); // Ensure dynamic file path handling.
+exports.InsertDataCsvfile = async (req, res) => {
+    console.log('hittt')
+  const { date, time } = getCurrentDateTime();
+  const days_add = addDaysToDate(date);
+  let file_name='PDSA_20241117060301.csv'
+  const filePath = path.join(__dirname, `../upload/${file_name}`); // Ensure dynamic file path handling.
 
-//   // Ensure the file exists
-//   if (!fs.existsSync(filePath)) {
-//     return res.status(404).json({
-//       success: false,
-//       message: 'File not found.',
-//     });
-//   }
 
-//   const batchSize = 50; // Process 50 rows at a time
+  // Ensure the file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      success: false,
+      message: 'File not found.',
+    });
+  }
 
-//   const processCsvFile = async () => {
-//     const dataToInsert = [];
-//     const linkDetailsToInsert = [];
-//     const rows = []; // Store rows for sequential processing
+  const batchSize = 1000; // Process 50 rows at a time
 
-//     // Read and parse CSV
-//     await new Promise((resolve, reject) => {
-//       fs.createReadStream(filePath)
-//         .pipe(csvParser())
-//         .on('data', (row) => {
-//           rows.push(row); // Store row for later processing
-//         })
-//         .on('end', resolve)
-//         .on('error', reject);
-//     });
+  const processCsvFile = async () => {
+    const dataToInsert = [];
+    const linkDetailsToInsert = [];
+    const rows = []; // Store rows for sequential processing
 
-//     for (let i = 0; i < rows.length; i++) {
-//       try {
-//         const row = rows[i];
-//         const fullName = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
-//         const admin_id = 'manthanadmin';
-//         const user_id = 'isly_honda';
-//         const final_message = 'final_message';
-//         const status = '1';
+    // Read and parse CSV
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .pipe(csvParser())
+        .on('data', (row) => {
+          rows.push(row); // Store row for later processing
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+    const sanitizeName = (name) => name.replace(/[^\w\s]/gi, '').trim();
+
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const row = rows[i];
+        const fullName11 = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
+        const  fullName=   sanitizeName(fullName11)
+        const admin_id = 'manthanadmin';
+        const user_id = 'isly_honda';
+        const final_message = 'final_message';
+        const status = '1';
        
-//         const vedio_url = process.env.LINKVEDIOLINK;
-//         const url_side = process.env.URL_SERVER;
+        const vedio_url = process.env.LINKVEDIOLINK;
+        const url_side = process.env.URL_SERVER;
 
-//         const BACKEDURL= process.env.BACKEDURL
+        const BACKEDURL= process.env.BACKEDURL
 
-//         // Generate unique short URLs
-//         const feedback_short_url = await generateUniqueShortUrl('link_details', BACKEDURL);
-//         const vedio_short_url = await generateUniqueShortUrl('link_details', BACKEDURL);
-//  const feedback_url = `http://192.168.0.122:3000/feedback?id=${feedback_short_url}`
-//         // Prepare data for bulk insertion
-//         dataToInsert.push([
-//           fullName,
-//           row['Customer mobile number'],
-//           row['Frame No'],
-//           row['Dealer_Code'],
-//           row['MODEL_NAME'],
-//           admin_id,
-//           user_id,
-//           feedback_url,
-//           feedback_short_url,
-//           final_message,
-//           status,
-//           vedio_url,
-//           vedio_short_url,
-//           date,
-//           time,
-//         ]);
+   
+        const feedback_short_url =""
+        const vedio_short_url ="" 
+ const feedback_url = `${process.env.URL_short_IP}/feedback?id=${feedback_short_url}`
 
-//         linkDetailsToInsert.push([
-//           generateUniqueId(10), // Unique ID for this record
-//           feedback_url,
-//           feedback_short_url,
-//           days_add,
-//           time,
-//           admin_id,
-//           days_add, // Validity date
-//           15, // Validity days
-//           '1',
-//         ]);
 
-//         // Insert batch when the size is reached or it's the last row
-//         if (dataToInsert.length >= batchSize || i === rows.length - 1) {
-//           await bulkInsertData(dataToInsert, linkDetailsToInsert);
-//           dataToInsert.length = 0; // Clear batch
-//           linkDetailsToInsert.length = 0;
-//         }
-//       } catch (error) {
-//         console.error('Error processing row:', error.message);
-//         // Continue processing other rows
-//       }
-//     }
-//   };
+        // Prepare data for bulk insertion
+        dataToInsert.push([
+          fullName,
+          row['Customer mobile number'],
+          row['Frame No'],
+          row['Dealer_Code'],
+          row['MODEL_NAME'],
+          admin_id,
+          user_id,
+          file_name,
+          feedback_url,
+          vedio_url,
+          date,
+          time,
+        ]);
 
-//   const generateUniqueShortUrl = async (tableName, url_side) => {
-//     let short_url;
-//     let isUnique = false;
+        linkDetailsToInsert.push([
+          generateUniqueId(10), // Unique ID for this record
+          feedback_url,
+          days_add,
+          time,
+          admin_id,
+          days_add, // Validity date
+          15, // Validity days
+          '1',
+        ]);
 
-//     while (!isUnique) {
-//       const uniqueId = generateUniqueId(10);
-//       short_url = `${url_side}/${uniqueId}`;
+        // Insert batch when the size is reached or it's the last row
+        if (dataToInsert.length >= batchSize || i === rows.length - 1) {
+          await bulkInsertData(dataToInsert, linkDetailsToInsert);
+          dataToInsert.length = 0; // Clear batch
+          linkDetailsToInsert.length = 0;
+        }
+      } catch (error) {
+        console.error('Error processing row:', error.message);
+        // Continue processing other rows
+      }
+    }
+  };
 
-//       // Check if the short URL is unique
-//       const checkQuery = `SELECT COUNT(*) AS count FROM ${tableName} WHERE short_url = ?`;
-//       const [result] = await executeQuery(checkQuery, [short_url]);
+ 
 
-//       if (result.count === 0) {
-//         isUnique = true;
-//       }
-//     }
-//     return short_url;
-//   };
+  const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
+   
+    try {
+      // Start database transaction
+    //   await executeQuery('START TRANSACTION');
 
-//   const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
-//     try {
-//       // Start database transaction
-//       await executeQuery('START TRANSACTION');
+    //   // Bulk insert data into `link_details`
+    //   if (linkDetailsToInsert.length > 0) {
+    //     const insertQueryLinkDetails = `
+    //       INSERT INTO link_details (
+    //         unique_id,
+    //         org_url,
+    //         short_url,
+    //         create_date,
+    //         create_time,
+    //         created_by,
+    //         validity_date,
+    //         validity_days,
+    //         status
+    //       ) VALUES ?`;
+    //     await executeQuery(insertQueryLinkDetails, [linkDetailsToInsert]);
+    //   }
 
-//       // Bulk insert data into `link_details`
-//       if (linkDetailsToInsert.length > 0) {
-//         const insertQueryLinkDetails = `
-//           INSERT INTO link_details (
-//             unique_id,
-//             org_url,
-//             short_url,
-//             create_date,
-//             create_time,
-//             created_by,
-//             validity_date,
-//             validity_days,
-//             status
-//           ) VALUES ?`;
-//         await executeQuery(insertQueryLinkDetails, [linkDetailsToInsert]);
-//       }
+    
 
-//       // Bulk insert data into `honda_url_data`
-//       if (dataToInsert.length > 0) {
-//         const insertQueryHondaData = `
-//           INSERT INTO honda_url_data (
-//             cust_name,
-//             mobile,
-//             frame_no,
-//             dealer_code,
-//             model_name,
-//             admin_id,
-//             user_id,
-//             feedback_url,
-//             feedback_short_url,
-//             final_message,
-//             status,
-//             vedio_url,
-//             vedio_short_url,
-//             cdate,
-//             ctime
-//           ) VALUES ?`;
-//         await executeQuery(insertQueryHondaData, [dataToInsert]);
-//       }
+      // Bulk insert data into `honda_url_data`
+      if (dataToInsert.length > 0) {
+        const insertQueryHondaData = `
+          INSERT INTO honda_url_data1 (
+            cust_name,
+            mobile_number,
+            frame_no,
+            dealer_code,
+            model_name,
+            admin_id,
+            user_id,
+            filename,
+            feedback_url,
+            vedio_url,
+            create_date,
+            create_time
+          ) VALUES ?`;
 
-//       // Commit the transaction
-//       await executeQuery('COMMIT');
-//     } catch (error) {
-//       console.error('Error in bulk insert:', error.message);
-//       await executeQuery('ROLLBACK');
-//       throw error;
-//     }
-//   };
+      
+        await executeQuery(insertQueryHondaData, [dataToInsert]);
+      }
 
-//   try {
-//     // Process the CSV file asynchronously
-//     await processCsvFile();
 
-//     res.status(200).json({
-//       success: true,
-//       message: 'All data inserted successfully.',
-//     });
-//   } catch (error) {
-//     console.error('Error processing the file:', error.message);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Internal Server Error.',
-//       error: error.message,
-//     });
-//   }
-// };
+    } catch (error) {
+      console.error('Error in bulk insert:', error.message);
+      await executeQuery('ROLLBACK');
+      throw error;
+    }
+  };
+
+  try {
+    // Process the CSV file asynchronously
+    await processCsvFile();
+
+    res.status(200).json({
+      success: true,
+      message: 'All data inserted successfully.',
+    });
+  } catch (error) {
+    console.error('Error processing the file:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Internal Server Error.',
+      error: error.message,
+    });
+  }
+};
 
   
   
