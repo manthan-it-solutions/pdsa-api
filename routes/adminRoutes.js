@@ -65,12 +65,7 @@ router.post('/getDealerDetailsZone' , authMiddleware ,adminMiddleware, adminCont
 router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
 
 
-
-
-
-
-
-// router.post('/getDealerDetailsRegion' , authMiddleware ,adminMiddleware, adminController.getDealerDetailsRegion)
+router.post('/insertdate_csvfile' , authMiddleware ,adminMiddleware, adminController.InsertDataCsvfile)
 
 router.post('/Searh_button_api' , authMiddleware ,adminMiddleware, adminController.Searh_button_api)
 
