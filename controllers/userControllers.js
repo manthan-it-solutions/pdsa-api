@@ -456,6 +456,10 @@ exports.select_user_details_by_user_id  = async (req,res)=>{
     console.log('hit1111');
     try {
         const id = req.body.id
+     let new_id = `http://192.168.0.119:8080/${id}`
+
+
+
       
 
      
@@ -469,7 +473,8 @@ exports.select_user_details_by_user_id  = async (req,res)=>{
     h.feedback_answer3,
     h.feedback_answer4,
     h.feedback_answer5,
-    d.dealer_name
+    d.dealer_name,
+ h.feedback_date
   FROM 
     honda_url_data h
   LEFT JOIN 
@@ -481,8 +486,9 @@ exports.select_user_details_by_user_id  = async (req,res)=>{
 
 `
        
-        const result = await executeQuery(query_select_details,[id,id])
-        console.log('result: ', result);
+        const result = await executeQuery(query_select_details,[new_id,new_id])
+       
+        
 
         res.status(200).send({success:"200", data:result})
 
@@ -498,9 +504,10 @@ exports.select_user_details_by_user_id  = async (req,res)=>{
 exports.submit_feedback = async (req,res)=>{
 
     try {
-console.log(req.body,'req.bodyreq.body');
+
         const { fullName,mobileNumber,modelName,dealership,receivedInfo,infoFormat,simulator,satisfaction,deliveryExperience}=req.body.formData 
 const id = req.body.id
+let new_id=`${process.env.BACKEDURL}/${id}`
         const {date,time} = getCurrentDateTime()
         
 
@@ -519,14 +526,11 @@ WHERE
     OR vedio_short_url =?;
 `
 
-
-        values =[receivedInfo,infoFormat,simulator,satisfaction,deliveryExperience,date,time,id,id]
-        console.log('values: ', values);
+	
 
 
-
-
-
+        values =[receivedInfo,infoFormat,simulator,satisfaction,deliveryExperience,date,time,new_id,new_id]
+  
         const result = await executeQuery (update_feedback_from,values)
 
         res.status(200).send({success:"updated"})

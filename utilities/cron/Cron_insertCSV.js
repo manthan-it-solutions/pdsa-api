@@ -64,7 +64,13 @@ async function transferHondaData() {
         for (let i = 0; i < sourceData.length; i++) {
             const row = sourceData[i];
             const feedback_short_url = feedbackUrls[i];
+           let new_feedback_id =feedback_short_url.split('/')[3]
             const video_short_url = videoUrls[i];
+
+           let new_vedio_url =video_short_url.split('/')[3]
+
+
+
 
             dataToInsert.push([
                 row.cust_name,
@@ -74,11 +80,11 @@ async function transferHondaData() {
                 row.model_name || '',
                 'manthanadmin',
                 'isly_honda',
-                row.feedback_url || '',
+                (row.feedback_url + new_feedback_id) || '',
                 feedback_short_url,
                 'final_message',
                 '1',
-                process.env.LINKVEDIOLINK || '',
+                (process.env.LINKVEDIOLINK + new_vedio_url) || '',
                 video_short_url,
                 new Date().toISOString().split('T')[0],
                 new Date().toLocaleTimeString()
@@ -117,10 +123,10 @@ async function transferHondaData() {
 }
 
 // Uncomment this line to schedule the job
-cron.schedule('*/5 * * * * *', () => {
-    console.log('Running scheduled transfer task...');
-    transferHondaData();
-});
+// cron.schedule('*/5 * * * * *', () => {
+//     console.log('Running scheduled transfer task...');
+//     transferHondaData();
+// });
 
 let isProcessMessage= false;
 // Function to transfer data from source table to destination table
@@ -146,16 +152,11 @@ async function Send_message_final() {
 
     
             for(let i=0;i<sourceData.length;i++){
-
-                console.log(i,'i')
-                console.log(sourceData[i].mobile,'mobile')
-
-
                   const row = sourceData[i]; // Processing one record at a time
+                 
     
                 // Send message
                 await message_send_api(row.mobile);
-    
                 const dataToInsert = [
                     row.cust_name,
                     row.mobile || '',
@@ -169,7 +170,7 @@ async function Send_message_final() {
                     'final_message',
                     '1',
                     process.env.LINKVEDIOLINK || '',
-                    row.video_short_url || '', // Use video short URL from source record
+                    row.vedio_short_url || '', // Use video short URL from source record
                     new Date().toISOString().split('T')[0],
                     new Date().toLocaleTimeString()
                 ];
@@ -209,7 +210,6 @@ async function Send_message_final1() {
         console.log('Process is already running, skipping this call.');
         return;  // Prevents the function from running if it's already in process
     }
-
     try{
         isProcessMessage=true;
         console.log('1')
@@ -237,7 +237,7 @@ async function  message_send_api(mobile){
 
 
 // send message cron th this line to schedule the job
-cron.schedule('*/15 * * * * *',async () => {
-    console.log('Running scheduled transfer task...');
-  await  Send_message_final();
-});
+// cron.schedule('*/15 * * * * *',async () => {
+//     console.log('Running scheduled transfer task...');
+//   await  Send_message_final();
+// });

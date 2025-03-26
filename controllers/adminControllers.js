@@ -1701,7 +1701,7 @@ exports.InsertDataCsvfile = async (req, res) => {
     console.log('hittt')
   const { date, time } = getCurrentDateTime();
   const days_add = addDaysToDate(date);
-  let file_name='PDSA_20241117060301.csv'
+  let file_name='PDSA_202411170603011.csv'
   const filePath = path.join(__dirname, `../upload/${file_name}`); // Ensure dynamic file path handling.
 
 
@@ -1798,28 +1798,6 @@ exports.InsertDataCsvfile = async (req, res) => {
   const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
    
     try {
-      // Start database transaction
-    //   await executeQuery('START TRANSACTION');
-
-    //   // Bulk insert data into `link_details`
-    //   if (linkDetailsToInsert.length > 0) {
-    //     const insertQueryLinkDetails = `
-    //       INSERT INTO link_details (
-    //         unique_id,
-    //         org_url,
-    //         short_url,
-    //         create_date,
-    //         create_time,
-    //         created_by,
-    //         validity_date,
-    //         validity_days,
-    //         status
-    //       ) VALUES ?`;
-    //     await executeQuery(insertQueryLinkDetails, [linkDetailsToInsert]);
-    //   }
-
-    
-
       // Bulk insert data into `honda_url_data`
       if (dataToInsert.length > 0) {
         const insertQueryHondaData = `

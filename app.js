@@ -85,6 +85,7 @@ app.use(async (req, res, next) => {
   
 
     const id = req.originalUrl
+    
       const unique_id  = `http://192.168.0.119:8080${id}`
 
     // Prepare SELECT query to fetch original URL
@@ -126,8 +127,11 @@ app.use(async (req, res, next) => {
         WHERE ${url_type === 'feedback' ? 'feedback_short_url' : 'vedio_short_url'} = ?
       `;
 
+    
+
       // Increment visit count and update metadata
-      await executeQuery(qryUpdateVisitCount, [
+      let result =  await executeQuery(qryUpdateVisitCount, [
+       
         city || 'Unknown',
         state || 'Unknown',
         country || 'Unknown',
@@ -135,6 +139,8 @@ app.use(async (req, res, next) => {
         time,
         unique_id,
       ]);
+
+    console.log(result,'resultresult');
 
       // Redirect the client to the original URL
       res.redirect(org_url);
