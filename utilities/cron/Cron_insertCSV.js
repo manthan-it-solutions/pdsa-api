@@ -56,6 +56,7 @@ async function transferHondaData() {
 
         // Generate unique short URLs in batch
         const feedbackUrls = await generateUniqueShortUrls(batchSize, destinationTable, baseurl);
+       
         const videoUrls = await generateUniqueShortUrls(batchSize, destinationTable, baseurl);
 
         const dataToInsert = [];
@@ -86,6 +87,9 @@ async function transferHondaData() {
                 '1',
                 (process.env.LINKVEDIOLINK + new_vedio_url) || '',
                 video_short_url,
+                row.filename,
+                new_feedback_id,
+                new_vedio_url,
                 new Date().toISOString().split('T')[0],
                 new Date().toLocaleTimeString()
             ]);
@@ -99,7 +103,7 @@ async function transferHondaData() {
             const insertQuery = `INSERT INTO ${destinationTable} (
                 cust_name, mobile, frame_no, dealer_code, model_name, admin_id, user_id, 
                 feedback_url, feedback_short_url, final_message, status_data, 
-                vedio_url, vedio_short_url, cdate, ctime
+                vedio_url, vedio_short_url,filename,short_url_feedback,short_url_vedio, cdate, ctime
             ) VALUES ?`;
 
             await executeQuery(insertQuery, [dataToInsert]);
@@ -220,6 +224,9 @@ let template_id= "123231"
                     row.vedio_short_url || '', // Use video short URL from source record
                     new Date().toISOString().split('T')[0],
                     new Date().toLocaleTimeString(),
+                    row.filename,
+                    row.short_url_feedback,
+                    row.short_url_vedio,
                     responseData,
                     msg_id
 
@@ -231,7 +238,7 @@ let template_id= "123231"
                     const insertQuery = `INSERT INTO ${destinationTable} (
                         cust_name, mobile, frame_no, dealer_code, model_name, admin_id, user_id, 
                         feedback_url, feedback_short_url, final_message, status, 
-                        vedio_url, vedio_short_url, cdate, ctime,response,msg_id
+                        vedio_url, vedio_short_url, cdate, ctime,filename,short_url_feedback,short_url_vedio,response,msg_id
                     ) VALUES ?`;
     
                     await executeQuery(insertQuery, [[dataToInsert]]);
