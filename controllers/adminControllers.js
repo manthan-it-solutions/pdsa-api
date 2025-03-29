@@ -1698,10 +1698,10 @@ console.log('2222222222');
 
 
 exports.InsertDataCsvfile = async (req, res) => {
-    console.log('hittt')
+   
   const { date, time } = getCurrentDateTime();
   const days_add = addDaysToDate(date);
-  let file_name='PDSA_202411170603011.csv'
+  let file_name='PDSA_20241117060301_new.csv'
   const filePath = path.join(__dirname, `../upload/${file_name}`); // Ensure dynamic file path handling.
 
 
@@ -1769,16 +1769,6 @@ exports.InsertDataCsvfile = async (req, res) => {
           time,
         ]);
 
-        linkDetailsToInsert.push([
-          generateUniqueId(10), // Unique ID for this record
-          feedback_url,
-          days_add,
-          time,
-          admin_id,
-          days_add, // Validity date
-          15, // Validity days
-          '1',
-        ]);
 
         // Insert batch when the size is reached or it's the last row
         if (dataToInsert.length >= batchSize || i === rows.length - 1) {
@@ -1795,7 +1785,7 @@ exports.InsertDataCsvfile = async (req, res) => {
 
  
 
-  const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
+  const bulkInsertData = async (dataToInsert) => {
    
     try {
       // Bulk insert data into `honda_url_data`
