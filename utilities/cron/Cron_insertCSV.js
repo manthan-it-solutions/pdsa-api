@@ -56,6 +56,7 @@ async function transferHondaData() {
 
         // Generate unique short URLs in batch
         const feedbackUrls = await generateUniqueShortUrls(batchSize, destinationTable, baseurl);
+       
         const videoUrls = await generateUniqueShortUrls(batchSize, destinationTable, baseurl);
 
         const dataToInsert = [];
@@ -86,6 +87,9 @@ async function transferHondaData() {
                 '1',
                 (process.env.LINKVEDIOLINK + new_vedio_url) || '',
                 video_short_url,
+                row.filename,
+                new_feedback_id,
+                new_vedio_url,
                 new Date().toISOString().split('T')[0],
                 new Date().toLocaleTimeString()
             ]);
@@ -99,7 +103,7 @@ async function transferHondaData() {
             const insertQuery = `INSERT INTO ${destinationTable} (
                 cust_name, mobile, frame_no, dealer_code, model_name, admin_id, user_id, 
                 feedback_url, feedback_short_url, final_message, status_data, 
-                vedio_url, vedio_short_url, cdate, ctime
+                vedio_url, vedio_short_url,filename,short_url_feedback,short_url_vedio, cdate, ctime
             ) VALUES ?`;
 
             await executeQuery(insertQuery, [dataToInsert]);
@@ -123,10 +127,10 @@ async function transferHondaData() {
 }
 
 // Uncomment this line to schedule the job
-// cron.schedule('*/5 * * * * *', () => {
-//     console.log('Running scheduled transfer task...');
-//     transferHondaData();
-// });
+cron.schedule('*/5 * * * * *', () => {
+    console.log('Running scheduled transfer task...');
+    transferHondaData();
+});
 
 let isProcessMessage= false;
 // Function to transfer data from source table to destination table
@@ -143,6 +147,17 @@ async function Send_message_final() {
         const destinationTable = 'honda_url_data';
         const baseurl = process.env.BACKEDURL;
 
+
+        let select_api_keyquery= `select api_key ,api_pass from customer_master `
+let resut_query_key = await executeQuery(select_api_keyquery)
+// console.log('resut_query_key: ', resut_query_key);
+let api_key=resut_query_key[0].api_key
+let api_password=resut_query_key[0].api_pass
+// let api_password="dfisdfig"
+
+let template_id= "123231"
+
+
         console.log('Starting data transfer process...');
 
         const selectQuery = `SELECT * FROM ${sourceTable} ORDER BY id LIMIT 600`; // Retrieve data one by one
@@ -156,7 +171,43 @@ async function Send_message_final() {
                  
     
                 // Send message
-                await message_send_api(row.mobile);
+          
+                let result= await message_send_api(row.mobile,row.short_url_feedback,row.short_url_vedio,api_key,api_password,template_id);
+
+                let errorMessage=''
+                let errorCode = ''
+
+                let responseData=''
+                let msg_id=''
+           if(result){
+
+            if(result.error){
+                errorMessage=result.error.message
+                errorCode=result.error.status
+                console.log('errorCode: ', errorCode);
+              
+            }
+            else{
+
+        
+           
+           
+              responseData = JSON.stringify(result) // Convert object to JSON string
+            //  if(responseData.status(204){
+              
+
+            //  })
+              msg_id = result?.data?.mid || 'ms101'; // Convert object to JSON string
+            }
+
+        }
+         
+          
+        //    let query_update_res= `UPDATE honda_url_data SET response=? WHERE feedback_short_url=?`;
+        //    console.log(query_update_res,row.feedback_short_url,'query_update_res')
+
+        //    let updatequeryexecute= await executeQuery(query_update_res ,[responseData,row.feedback_short_url])
+        //    console.log('updatequeryexecute: ', updatequeryexecute);
                 const dataToInsert = [
                     row.cust_name,
                     row.mobile || '',
@@ -172,7 +223,13 @@ async function Send_message_final() {
                     process.env.LINKVEDIOLINK || '',
                     row.vedio_short_url || '', // Use video short URL from source record
                     new Date().toISOString().split('T')[0],
-                    new Date().toLocaleTimeString()
+                    new Date().toLocaleTimeString(),
+                    row.filename,
+                    row.short_url_feedback,
+                    row.short_url_vedio,
+                    responseData,
+                    msg_id
+
                 ];
     
                 const sourceId = row.id;
@@ -181,7 +238,7 @@ async function Send_message_final() {
                     const insertQuery = `INSERT INTO ${destinationTable} (
                         cust_name, mobile, frame_no, dealer_code, model_name, admin_id, user_id, 
                         feedback_url, feedback_short_url, final_message, status, 
-                        vedio_url, vedio_short_url, cdate, ctime
+                        vedio_url, vedio_short_url, cdate, ctime,filename,short_url_feedback,short_url_vedio,response,msg_id
                     ) VALUES ?`;
     
                     await executeQuery(insertQuery, [[dataToInsert]]);
@@ -197,6 +254,8 @@ async function Send_message_final() {
                 }
             }  
          }    
+    
+    
     } catch (error) {
         console.error('Data transfer error:', error);
     } finally {
@@ -222,22 +281,47 @@ async function Send_message_final1() {
 }
 
 
-async function  message_send_api(mobile){
+async function message_send_api(mobile, short_url_feedback, short_url_vedio,api_key,api_password,template_id) {
     try {
-        
-        console.log('send message cron');
-        return "ok"
+        const axios = require('axios');
+
+        let data = JSON.stringify({
+            "mobile_number": mobile,
+            "feedback_url": short_url_feedback,
+            "vedio_url": short_url_vedio,
+            "api_key":api_key,
+            "api_pass":api_password,
+            "template_id":template_id
+        });
+
+        let config = {
+            method: 'post',
+            maxBodyLength: Infinity,
+            url: 'https://api.easygowp.com/pdsa/hit_pdsa_send_message',
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            data: data
+        };
+
+        const response = await axios.request(config);
+        console.log('response: ', response);
+        return response.data;
 
     } catch (error) {
-        console.log('error: ', error);
-        
+        // console.log('Error:', error.response);
+        return { error: error.response }; // Return an error response
     }
 }
+
+// Example usage
+
+
 
 
 
 // send message cron th this line to schedule the job
-// cron.schedule('*/15 * * * * *',async () => {
-//     console.log('Running scheduled transfer task...');
-//   await  Send_message_final();
-// });
+cron.schedule('*/15 * * * * *',async () => {
+    console.log('Running scheduled transfer task...');
+  await  Send_message_final();
+});

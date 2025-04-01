@@ -453,10 +453,10 @@ exports.get_dashboard_data_user = async (req, res) => {
 
 
 exports.select_user_details_by_user_id  = async (req,res)=>{
-    console.log('hit1111');
+
     try {
         const id = req.body.id
-     let new_id = `http://192.168.0.119:8080/${id}`
+     let new_id = `${process.env.BACKEDURL}/${id}`
 
 
 

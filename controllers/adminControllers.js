@@ -3,6 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const csvParser = require('csv-parser');
+const AWS = require('aws-sdk');
+
 
 
 const authService = require('../services/authServices')
@@ -1688,163 +1690,264 @@ console.log('2222222222');
 
 };
 
+// Initialize S3
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWSACCESSKEYID,
+    secretAccessKey: process.env.AWSSECRETACCESSKEY
+   
+});
 
+const bucketName = 'hondapdsa';
+const folderName = 'datafile/'; // The folder inside the bucket where the file is located
+const filePrefix = 'PDSA_'; // Prefix for files to filter
 
+// Function to get the latest file with prefix 'PDSA_' inside the 'datafile/' folder
+async function getLatestFile() {
+    try {
+        const objects = await s3.listObjectsV2({
+            Bucket: bucketName,
+            Prefix: folderName // Only list objects inside the 'datafile/' folder
+        }).promise();
 
+        console.log('Fetched objects:', objects); // Log objects to verify
 
+        // Filter files that start with 'PDSA_' and end with '.csv'
+        const pdsaFiles = objects.Contents
+            .map(obj => obj.Key)
+            .filter(name => name.startsWith(folderName + filePrefix) && name.endsWith('.csv')) // Adjusted filter for '.csv'
+            .sort((a, b) => b.localeCompare(a)); // Sort files in descending order to get the latest file
 
+        console.log('Filtered PDSA files:', pdsaFiles); // Log filtered files
 
+        // Return the latest file if found
+        return pdsaFiles.length > 0 ? pdsaFiles[0] : null;
+    } catch (error) {
+        console.error('Error fetching S3 files:', error.message);
+        throw error;
+    }
+}
 
-
-
-exports.InsertDataCsvfile = async (req, res) => {
-    console.log('hittt')
-  const { date, time } = getCurrentDateTime();
-  const days_add = addDaysToDate(date);
-  let file_name='PDSA_202411170603011.csv'
-  const filePath = path.join(__dirname, `../upload/${file_name}`); // Ensure dynamic file path handling.
-
-
-  // Ensure the file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({
-      success: false,
-      message: 'File not found.',
-    });
-  }
-
-  const batchSize = 1000; // Process 50 rows at a time
-
-  const processCsvFile = async () => {
+// Function to process CSV file and insert data into the database
+async function processCsvFile(filePath, fileName) {
     const dataToInsert = [];
-    const linkDetailsToInsert = [];
-    const rows = []; // Store rows for sequential processing
+    const batchSize = 1000;
 
-    // Read and parse CSV
     await new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csvParser())
-        .on('data', (row) => {
-          rows.push(row); // Store row for later processing
-        })
-        .on('end', resolve)
-        .on('error', reject);
+        fs.createReadStream(filePath)
+            .pipe(csvParser())
+            .on('data', (row) => {
+                // Prepare row for DB insertion
+                dataToInsert.push([ 
+                    row['Customer First name'] + ' ' + row['Customer Last name'],
+                    row['Customer mobile number'],
+                    row['Frame No'],
+                    row['Dealer_Code'],
+                    row['MODEL_NAME'],
+                    'manthanadmin',
+                    'isly_honda',
+                    fileName,
+                    `${process.env.URL_short_IP}/feedback?id=`,
+                    process.env.LINKVEDIOLINK,
+                    new Date().toISOString().split('T')[0], // Date in yyyy-mm-dd
+                    new Date().toISOString().split('T')[1].split('.')[0] // Time in hh:mm:ss
+                ]);
+            })
+            .on('end', resolve)
+            .on('error', reject);
     });
-    const sanitizeName = (name) => name.replace(/[^\w\s]/gi, '').trim();
+    // Bulk insert the data if available
+    if (dataToInsert.length > 0) {
+        await executeQuery(
+            `INSERT INTO honda_url_data1 (cust_name, mobile_number, frame_no, dealer_code, model_name, admin_id, user_id, filename, feedback_url, vedio_url, create_date, create_time) VALUES ?`,
+            [dataToInsert]
+        );
+    }
 
-    for (let i = 0; i < rows.length; i++) {
-      try {
-        const row = rows[i];
-        const fullName11 = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
-        const  fullName=   sanitizeName(fullName11)
-        const admin_id = 'manthanadmin';
-        const user_id = 'isly_honda';
-        const final_message = 'final_message';
-        const status = '1';
+    let insert_file_query= `INSERT INTO file_upload_master (filename, filePath) values (?,?) `
+
+    let execute_query_insert_filename = await executeQuery (insert_file_query, [fileName,filePath])
+}
+
+// Main function to handle file processing and insertion
+exports.InsertDataCsvfile = async (req, res) => {
+    try {
+        // Get the latest file
+        const fileName = await getLatestFile();
+        if (!fileName) {
+            return res.status(404).json({ success: false, message: 'No files found in S3 bucket.' });
+        }
+
+        // Check if the file has already been uploaded in the DB
+        const existingFile = await executeQuery(
+            `SELECT filename FROM file_upload_master WHERE filename = ?`, 
+            [fileName]
+        );
+
+        if (existingFile.length > 0) {
+            return res.status(400).json({ success: false, message: 'This file has already been uploaded.' });
+        }
+
+        const localFilePath = path.join(__dirname, `../upload/${fileName}`);
+
+        // Download the file from S3
+        const fileData = await s3.getObject({ Bucket: bucketName, Key: fileName }).promise();
+        fs.writeFileSync(localFilePath, fileData.Body);
+        console.log(`File downloaded: ${localFilePath}`);
+
+        // Process the CSV file and insert data
+        await processCsvFile(localFilePath, fileName);
+
+        // Respond success
+        res.status(200).json({ success: true, message: 'All data inserted successfully.' });
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
+    }
+};
+
+
+// exports.InsertDataCsvfile = async (req, res) => {
+   
+//   const { date, time } = getCurrentDateTime();
+//   const days_add = addDaysToDate(date);
+//   let file_name='PDSA_20241117060301_new.csv'
+//   const filePath = path.join(__dirname, `../upload/${file_name}`); // Ensure dynamic file path handling.
+
+
+//   // Ensure the file exists
+//   if (!fs.existsSync(filePath)) {
+//     return res.status(404).json({
+//       success: false,
+//       message: 'File not found.',
+//     });
+//   }
+
+//   const batchSize = 1000; // Process 50 rows at a time
+
+//   const processCsvFile = async () => {
+//     const dataToInsert = [];
+//     const linkDetailsToInsert = [];
+//     const rows = []; // Store rows for sequential processing
+
+//     // Read and parse CSV
+//     await new Promise((resolve, reject) => {
+//       fs.createReadStream(filePath)
+//         .pipe(csvParser())
+//         .on('data', (row) => {
+//           rows.push(row); // Store row for later processing
+//         })
+//         .on('end', resolve)
+//         .on('error', reject);
+//     });
+//     const sanitizeName = (name) => name.replace(/[^\w\s]/gi, '').trim();
+
+//     for (let i = 0; i < rows.length; i++) {
+//       try {
+//         const row = rows[i];
+//         const fullName11 = `${row['Customer First name']} ${row['Customer Last name']}`.trim();
+//         const  fullName=   sanitizeName(fullName11)
+//         const admin_id = 'manthanadmin';
+//         const user_id = 'isly_honda';
+//         const final_message = 'final_message';
+//         const status = '1';
        
-        const vedio_url = process.env.LINKVEDIOLINK;
-        const url_side = process.env.URL_SERVER;
+//         const vedio_url = process.env.LINKVEDIOLINK;
+//         const url_side = process.env.URL_SERVER;
 
-        const BACKEDURL= process.env.BACKEDURL
+//         const BACKEDURL= process.env.BACKEDURL
 
    
-        const feedback_short_url =""
-        const vedio_short_url ="" 
- const feedback_url = `${process.env.URL_short_IP}/feedback?id=${feedback_short_url}`
+//         const feedback_short_url =""
+//         const vedio_short_url ="" 
+//  const feedback_url = `${process.env.URL_short_IP}/feedback?id=${feedback_short_url}`
 
 
-        // Prepare data for bulk insertion
-        dataToInsert.push([
-          fullName,
-          row['Customer mobile number'],
-          row['Frame No'],
-          row['Dealer_Code'],
-          row['MODEL_NAME'],
-          admin_id,
-          user_id,
-          file_name,
-          feedback_url,
-          vedio_url,
-          date,
-          time,
-        ]);
+//         // Prepare data for bulk insertion
+//         dataToInsert.push([
+//           fullName,
+//           row['Customer mobile number'],
+//           row['Frame No'],
+//           row['Dealer_Code'],
+//           row['MODEL_NAME'],
+//           admin_id,
+//           user_id,
+//           file_name,
+//           feedback_url,
+//           vedio_url,
+//           date,
+//           time,
+//         ]);
 
-        linkDetailsToInsert.push([
-          generateUniqueId(10), // Unique ID for this record
-          feedback_url,
-          days_add,
-          time,
-          admin_id,
-          days_add, // Validity date
-          15, // Validity days
-          '1',
-        ]);
 
-        // Insert batch when the size is reached or it's the last row
-        if (dataToInsert.length >= batchSize || i === rows.length - 1) {
-          await bulkInsertData(dataToInsert, linkDetailsToInsert);
-          dataToInsert.length = 0; // Clear batch
-          linkDetailsToInsert.length = 0;
-        }
-      } catch (error) {
-        console.error('Error processing row:', error.message);
-        // Continue processing other rows
-      }
-    }
-  };
+//         // Insert batch when the size is reached or it's the last row
+//         if (dataToInsert.length >= batchSize || i === rows.length - 1) {
+//           await bulkInsertData(dataToInsert, linkDetailsToInsert);
+//           dataToInsert.length = 0; // Clear batch
+//           linkDetailsToInsert.length = 0;
+//         }
+//       } catch (error) {
+//         console.error('Error processing row:', error.message);
+//         // Continue processing other rows
+//       }
+//     }
+//   };
 
  
 
-  const bulkInsertData = async (dataToInsert, linkDetailsToInsert) => {
+//   const bulkInsertData = async (dataToInsert) => {
    
-    try {
-      // Bulk insert data into `honda_url_data`
-      if (dataToInsert.length > 0) {
-        const insertQueryHondaData = `
-          INSERT INTO honda_url_data1 (
-            cust_name,
-            mobile_number,
-            frame_no,
-            dealer_code,
-            model_name,
-            admin_id,
-            user_id,
-            filename,
-            feedback_url,
-            vedio_url,
-            create_date,
-            create_time
-          ) VALUES ?`;
+//     try {
+//       // Bulk insert data into `honda_url_data`
+//       if (dataToInsert.length > 0) {
+//         const insertQueryHondaData = `
+//           INSERT INTO honda_url_data1 (
+//             cust_name,
+//             mobile_number,
+//             frame_no,
+//             dealer_code,
+//             model_name,
+//             admin_id,
+//             user_id,
+//             filename,
+//             feedback_url,
+//             vedio_url,
+//             create_date,
+//             create_time
+//           ) VALUES ?`;
 
       
-        await executeQuery(insertQueryHondaData, [dataToInsert]);
-      }
+//         await executeQuery(insertQueryHondaData, [dataToInsert]);
+//       }
 
 
-    } catch (error) {
-      console.error('Error in bulk insert:', error.message);
-      await executeQuery('ROLLBACK');
-      throw error;
-    }
-  };
+//     } catch (error) {
+//       console.error('Error in bulk insert:', error.message);
+//       await executeQuery('ROLLBACK');
+//       throw error;
+//     }
+//   };
 
-  try {
-    // Process the CSV file asynchronously
-    await processCsvFile();
+//   try {
+//     // Process the CSV file asynchronously
+//     await processCsvFile();
 
-    res.status(200).json({
-      success: true,
-      message: 'All data inserted successfully.',
-    });
-  } catch (error) {
-    console.error('Error processing the file:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Internal Server Error.',
-      error: error.message,
-    });
-  }
-};
+//     res.status(200).json({
+//       success: true,
+//       message: 'All data inserted successfully.',
+//     });
+//   } catch (error) {
+//     console.error('Error processing the file:', error.message);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Internal Server Error.',
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+
 
   
   
