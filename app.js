@@ -86,7 +86,7 @@ app.use(async (req, res, next) => {
 
     const id = req.originalUrl
     
-      const unique_id  = `http://192.168.0.119:8080${id}`
+      const unique_id  = `${process.env.BACKEDURL}${id}`
 
     // Prepare SELECT query to fetch original URL
     const qrySelect = `
@@ -140,7 +140,7 @@ app.use(async (req, res, next) => {
         unique_id,
       ]);
 
-    console.log(result,'resultresult');
+    
 
       // Redirect the client to the original URL
       res.redirect(org_url);

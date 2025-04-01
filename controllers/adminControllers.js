@@ -1755,7 +1755,6 @@ async function processCsvFile(filePath, fileName) {
             .on('end', resolve)
             .on('error', reject);
     });
-
     // Bulk insert the data if available
     if (dataToInsert.length > 0) {
         await executeQuery(
@@ -1763,6 +1762,10 @@ async function processCsvFile(filePath, fileName) {
             [dataToInsert]
         );
     }
+
+    let insert_file_query= `INSERT INTO file_upload_master (filename, filePath) values (?,?) `
+
+    let execute_query_insert_filename = await executeQuery (insert_file_query, [fileName,filePath])
 }
 
 // Main function to handle file processing and insertion
@@ -1776,7 +1779,7 @@ exports.InsertDataCsvfile = async (req, res) => {
 
         // Check if the file has already been uploaded in the DB
         const existingFile = await executeQuery(
-            `SELECT filename FROM honda_url_data WHERE filename = ?`, 
+            `SELECT filename FROM file_upload_master WHERE filename = ?`, 
             [fileName]
         );
 

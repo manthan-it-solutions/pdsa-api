@@ -172,7 +172,7 @@ let template_id= "123231"
     
                 // Send message
           
-                let result= await message_send_api(row.mobile,row.feedback_short_url,row.vedio_short_url,api_key,api_password,template_id);
+                let result= await message_send_api(row.mobile,row.short_url_feedback,row.short_url_vedio,api_key,api_password,template_id);
 
                 let errorMessage=''
                 let errorCode = ''
@@ -281,14 +281,14 @@ async function Send_message_final1() {
 }
 
 
-async function message_send_api(mobile, feedback_url, vedio_url,api_key,api_password,template_id) {
+async function message_send_api(mobile, short_url_feedback, short_url_vedio,api_key,api_password,template_id) {
     try {
         const axios = require('axios');
 
         let data = JSON.stringify({
             "mobile_number": mobile,
-            "feedback_url": feedback_url,
-            "vedio_url": vedio_url,
+            "feedback_url": short_url_feedback,
+            "vedio_url": short_url_vedio,
             "api_key":api_key,
             "api_pass":api_password,
             "template_id":template_id
@@ -297,7 +297,7 @@ async function message_send_api(mobile, feedback_url, vedio_url,api_key,api_pass
         let config = {
             method: 'post',
             maxBodyLength: Infinity,
-            url: 'http://192.168.0.142:8000/pdsa/hit_pdsa_send_message',
+            url: 'https://api.easygowp.com/pdsa/hit_pdsa_send_message',
             headers: { 
                 'Content-Type': 'application/json'
             },
