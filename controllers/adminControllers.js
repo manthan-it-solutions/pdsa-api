@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const csvParser = require('csv-parser');
 const AWS = require('aws-sdk');
+const axios = require('axios');
 
 
 
@@ -1657,6 +1658,9 @@ console.log('2222222222');
                   
         `;
 
+
+      
+
         const totaldata111 = await executeQuery(totaldata, [region,]);
        
        
@@ -1946,6 +1950,78 @@ exports.InsertDataCsvfile = async (req, res) => {
 // };
 
 
+
+exports.PdsaUserBalance = async (req, res) => {
+    try {
+
+console.log('hitttts');
+        let select_api_keyquery= `select api_key ,api_pass from customer_master `
+        let resut_query_key = await executeQuery(select_api_keyquery)
+        // console.log('resut_query_key: ', resut_query_key);
+        let api_key=resut_query_key[0].api_key
+        let api_password=resut_query_key[0].api_pass
+
+       let response = await  Balence_fitch_pdsa(api_key,api_password)
+
+       if(response){
+        console.log('response: ', response);
+
+        if(response.success){
+            res.status(200).json({balance:response.balance[0].balance});
+
+        }else{
+
+            // res.status(210).json({
+            
+            // })
+        }
+       }
+       else{
+        res.status(210).json({
+            success:false,
+            message:'No Balance found'
+        });
+       }
+    
+    } catch (error) {
+        console.error('API Request Failed:', error.message);
+        res.status(500).json({ error: "Failed to fetch balance", details: error.message });
+    }
+};
+
+
+
+async function Balence_fitch_pdsa(api_key,api_password){
+    try {
+
+        let data = JSON.stringify({
+            "api_key": api_key,
+            "api_pass": api_password
+          });
+
+
+        let config = {
+            method: 'post',
+            maxBodyLength: Infinity,
+            url: 'https://apipathwp.com/pdsa/whtsapp_balance_check',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            data : data
+          };
+  
+          const response = await axios.request(config);
+       
+        
+          return response.data;
+        
+    } catch (error) {
+        console.log('error: ', error);
+        return false;
+      
+        
+    }
+}
 
 
 
