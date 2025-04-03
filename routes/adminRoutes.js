@@ -31,7 +31,7 @@ router.put('/update-zone', authMiddleware, adminMiddleware, adminController.upda
 router.post('/get_zone_data', authMiddleware, adminMiddleware, adminController.getZonedata)
 
 
-
+router.post('/pdsa_balance_header' , authMiddleware , adminMiddleware , adminController.PdsaUserBalance )
 
 router.post('/update_profile_data',authMiddleware,adminMiddleware, adminController.updateProfile)
 
