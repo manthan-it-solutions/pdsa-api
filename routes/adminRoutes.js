@@ -74,7 +74,7 @@ router.post('/Searh_button_api' , authMiddleware ,adminMiddleware, adminControll
 router.post('/Searh_button_api_region' , authMiddleware ,adminMiddleware, adminController.Searh_button_api_region)
 
 
-
+router.post('/pdsa_balance_header' , authMiddleware , adminMiddleware , adminController.PdsaUserBalance )
 
 
 

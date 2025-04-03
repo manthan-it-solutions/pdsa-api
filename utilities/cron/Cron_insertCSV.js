@@ -297,7 +297,7 @@ async function message_send_api(mobile, short_url_feedback, short_url_vedio,api_
         let config = {
             method: 'post',
             maxBodyLength: Infinity,
-            url: 'https://api.easygowp.com/pdsa/hit_pdsa_send_message',
+            url: 'https://apipathwp.com/pdsa/hit_pdsa_send_message',
             headers: { 
                 'Content-Type': 'application/json'
             },
