@@ -14,7 +14,8 @@ const bcrypt = require ('bcrypt')
 const uploadHelper = require ('../utilities/uploadHelper');
 const  generateUniqueId =require('../utilities/uniqueNumber')
 
-const {getCurrentDateTime,addDaysToDate} = require('../utilities/DateTimefunction')
+const {getCurrentDateTime,addDaysToDate} = require('../utilities/DateTimefunction');
+const { response } = require('express');
 
 
 
@@ -305,6 +306,29 @@ exports.getZonedata=async (req,res)=>{
         
     }
 }
+
+
+
+
+exports.getDesignationData=async (req,res)=>{
+    try {
+        const select_query = `select user_designation from designation_master`
+
+        const result = await executeQuery(select_query)
+        console.log('result: ', result);
+       
+        
+
+        res.status(200).json({data:result})
+
+        
+    } catch (error) {
+        console.log('error: ', error);
+        
+    }
+}
+
+
 
 
 
@@ -2030,16 +2054,53 @@ exports.GetDataTransaction= async (req,res)=>{
         let api_key=resut_query_key[0].api_key
         let api_password=resut_query_key[0].api_pass
 
-        
+        let {page , limit} = req.query
 
-
-        
+      let response = await FitchDataTransaction(api_key,api_password,page,limit)
+      console.log('response: ', response);
+  
+if (response){
+    res.status(200).json({response})
+}           
     } catch (error) {
         console.log('error: ', error);
         
     }
 }
 
+
+
+async function FitchDataTransaction(api_key,api_password,page,limit) {
+
+    try {
+
+let data = JSON.stringify({
+  "api_key" : api_key ,
+  "api_pass": api_password,
+  "page": page,
+  "limit":limit
+});
+
+let config = {
+  method: 'post',
+  maxBodyLength: Infinity,
+  url: 'https://apipathwp.com/pdsa/transactionhistory',
+  headers: { 
+    'Content-Type': 'application/json'
+  },
+  data : data
+};
+
+ let response= await axios.request(config)
+
+ 
+  return response.data  
+    } catch (error) {
+        console.log('error: ', error);
+        
+    }
+    
+}
 
 
   
