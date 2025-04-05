@@ -29,38 +29,35 @@ exports.getUsers = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
         const currentUserId = req.user.user_id;
+        console.log('currentUserId:', currentUserId);
 
-        const countQuery = `SELECT COUNT(*) AS total 
-                            FROM user_master
-                            WHERE user_id != ${currentUserId}`;
+        const countQuery = `SELECT COUNT(*) AS total FROM user_master WHERE user_id != ?`;
+        const userQuery = `SELECT * FROM user_master WHERE user_id != ? ORDER BY id DESC LIMIT ? OFFSET ?`;
 
-        const query = `SELECT *
-                       FROM user_master
-                       WHERE user_id != ${currentUserId}
-                       ORDER BY id DESC
-                       LIMIT ${limit} OFFSET ${offset}`;
-
+        // Promise.all to execute queries in parallel
         const [data, count] = await Promise.all([
-            
-            executeQuery(query),
-            executeQuery(countQuery)
+            executeQuery(userQuery, [currentUserId, limit, offset]),
+            executeQuery(countQuery, [currentUserId])
         ]);
+
         const total = count.length ? count[0].total : 0;
         const totalPages = Math.ceil(total / limit);
 
         res.json({
             success: true,
-            data: data,
-            total: total,
-            page: page,
-            limit: limit,
-            totalPages: totalPages
+            data,
+            total,
+            page,
+            limit,
+            totalPages
         });
 
     } catch (error) {
+        console.error('Error:', error);
         return next(error);
     }
 };
+
 
 
 
@@ -1780,16 +1777,29 @@ async function processCsvFile(filePath, fileName) {
             .on('error', reject);
     });
 
-    // Bulk insert only if there are valid records
+    // Function to split array into chunks
+    function chunkArray(array, size) {
+        const chunks = [];
+        for (let i = 0; i < array.length; i += size) {
+            chunks.push(array.slice(i, i + size));
+        }
+        return chunks;
+    }
+
+    // Bulk insert in chunks if there are valid records
     if (dataToInsert.length > 0) {
-        await executeQuery(
-            `INSERT INTO honda_url_data1 (cust_name, mobile_number, frame_no, dealer_code, model_name, admin_id, user_id, filename, feedback_url, vedio_url, create_date, create_time) VALUES ?`,
-            [dataToInsert]
-        );
+        const chunks = chunkArray(dataToInsert, 600);
+        for (const chunk of chunks) {
+            await executeQuery(
+                `INSERT INTO honda_url_data1 (cust_name, mobile_number, frame_no, dealer_code, model_name, admin_id, user_id, filename, feedback_url, vedio_url, create_date, create_time) VALUES ?`,
+                [chunk]
+            );
+        }
     }
 
     console.log(`Processing complete. Inserted: ${dataToInsert.length}, Skipped invalid: ${invalidCount}`);
 }
+
 
 // Main function to handle file processing and insertion
 exports.InsertDataCsvfile = async (req, res) => {
@@ -1802,7 +1812,7 @@ exports.InsertDataCsvfile = async (req, res) => {
 
         // Check if the file has already been uploaded in the DB
         const existingFile = await executeQuery(
-            `SELECT filename FROM file_upload_master WHERE filename = ?`, 
+            `SELECT filename FROM file_upload_master WHERE filename = ?`,
             [fileName]
         );
 
@@ -1817,6 +1827,22 @@ exports.InsertDataCsvfile = async (req, res) => {
         fs.writeFileSync(localFilePath, fileData.Body);
         console.log(`File downloaded: ${localFilePath}`);
 
+        // ✅ Delete the file from S3 after downloading
+        await s3.deleteObject({ Bucket: bucketName, Key: fileName }).promise();
+        console.log(`File deleted from S3: ${fileName}`);
+
+        // ✅ Prepare date and time
+        const currentDate = new Date();
+        const createDate = currentDate.toISOString().split('T')[0]; // yyyy-mm-dd
+        const createTime = currentDate.toISOString().split('T')[1].split('.')[0]; // hh:mm:ss
+
+        // ✅ Insert filename, date, time, and filepath into file_upload_master
+        await executeQuery(
+            `INSERT INTO file_upload_master (filename, create_date, create_time, filepath) VALUES (?, ?, ?, ?)`,
+            [fileName, createDate, createTime, localFilePath]
+        );
+        console.log(`File metadata inserted into DB: ${fileName}`);
+
         // Process the CSV file and insert data
         await processCsvFile(localFilePath, fileName);
 
@@ -1827,6 +1853,8 @@ exports.InsertDataCsvfile = async (req, res) => {
         res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
     }
 };
+
+
 
 
 // exports.InsertDataCsvfile = async (req, res) => {
