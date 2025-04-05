@@ -31,7 +31,11 @@ router.put('/update-zone', authMiddleware, adminMiddleware, adminController.upda
 router.post('/get_zone_data', authMiddleware, adminMiddleware, adminController.getZonedata)
 
 
+router.post('/get_designation_data', authMiddleware, adminMiddleware, adminController.getDesignationData)
 
+
+
+router.post('/pdsa_balance_header' , authMiddleware , adminMiddleware , adminController.PdsaUserBalance )
 
 router.post('/update_profile_data',authMiddleware,adminMiddleware, adminController.updateProfile)
 
@@ -74,7 +78,11 @@ router.post('/Searh_button_api' , authMiddleware ,adminMiddleware, adminControll
 router.post('/Searh_button_api_region' , authMiddleware ,adminMiddleware, adminController.Searh_button_api_region)
 
 
+router.post('/pdsa_balance_header' , authMiddleware , adminMiddleware , adminController.PdsaUserBalance )
 
+
+
+router.get('/pdsa_transaction_details' , authMiddleware , adminMiddleware , adminController.GetDataTransaction )
 
 
 

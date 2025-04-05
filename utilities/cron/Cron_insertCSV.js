@@ -170,6 +170,14 @@ let template_id= "123231"
                   const row = sourceData[i]; // Processing one record at a time
                  
     
+
+                  const sourceId = row.id;
+
+
+
+                  const deleteQuery = `DELETE FROM ${sourceTable} WHERE id = ?`;
+                  await executeQuery(deleteQuery, [sourceId]);
+      
                 // Send message
           
                 let result= await message_send_api(row.mobile,row.short_url_feedback,row.short_url_vedio,api_key,api_password,template_id);
@@ -187,15 +195,10 @@ let template_id= "123231"
                 console.log('errorCode: ', errorCode);
               
             }
-            else{
-
-        
-           
-           
+            else{          
               responseData = JSON.stringify(result) // Convert object to JSON string
             //  if(responseData.status(204){
-              
-
+            
             //  })
               msg_id = result?.data?.mid || 'ms101'; // Convert object to JSON string
             }
@@ -232,8 +235,7 @@ let template_id= "123231"
 
                 ];
     
-                const sourceId = row.id;
-    
+           
                 try {
                     const insertQuery = `INSERT INTO ${destinationTable} (
                         cust_name, mobile, frame_no, dealer_code, model_name, admin_id, user_id, 
@@ -243,8 +245,7 @@ let template_id= "123231"
     
                     await executeQuery(insertQuery, [[dataToInsert]]);
     
-                    const deleteQuery = `DELETE FROM ${sourceTable} WHERE id = ?`;
-                    await executeQuery(deleteQuery, [sourceId]);
+                   
     
                     
                     console.log(`Successfully transferred and deleted record with ID: ${sourceId}`);
@@ -297,7 +298,7 @@ async function message_send_api(mobile, short_url_feedback, short_url_vedio,api_
         let config = {
             method: 'post',
             maxBodyLength: Infinity,
-            url: 'https://api.easygowp.com/pdsa/hit_pdsa_send_message',
+            url: 'https://apipathwp.com/pdsa/hit_pdsa_send_message',
             headers: { 
                 'Content-Type': 'application/json'
             },
@@ -305,7 +306,6 @@ async function message_send_api(mobile, short_url_feedback, short_url_vedio,api_
         };
 
         const response = await axios.request(config);
-        console.log('response: ', response);
         return response.data;
 
     } catch (error) {

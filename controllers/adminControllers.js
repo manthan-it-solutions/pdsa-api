@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const csvParser = require('csv-parser');
 const AWS = require('aws-sdk');
+const axios = require('axios');
 
 
 
@@ -13,7 +14,8 @@ const bcrypt = require ('bcrypt')
 const uploadHelper = require ('../utilities/uploadHelper');
 const  generateUniqueId =require('../utilities/uniqueNumber')
 
-const {getCurrentDateTime,addDaysToDate} = require('../utilities/DateTimefunction')
+const {getCurrentDateTime,addDaysToDate} = require('../utilities/DateTimefunction');
+const { response } = require('express');
 
 
 
@@ -27,38 +29,35 @@ exports.getUsers = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
         const currentUserId = req.user.user_id;
+        console.log('currentUserId:', currentUserId);
 
-        const countQuery = `SELECT COUNT(*) AS total 
-                            FROM user_master
-                            WHERE user_id != ${currentUserId}`;
+        const countQuery = `SELECT COUNT(*) AS total FROM user_master WHERE user_id != ?`;
+        const userQuery = `SELECT * FROM user_master WHERE user_id != ? ORDER BY id DESC LIMIT ? OFFSET ?`;
 
-        const query = `SELECT *
-                       FROM user_master
-                       WHERE user_id != ${currentUserId}
-                       ORDER BY id DESC
-                       LIMIT ${limit} OFFSET ${offset}`;
-
+        // Promise.all to execute queries in parallel
         const [data, count] = await Promise.all([
-            
-            executeQuery(query),
-            executeQuery(countQuery)
+            executeQuery(userQuery, [currentUserId, limit, offset]),
+            executeQuery(countQuery, [currentUserId])
         ]);
+
         const total = count.length ? count[0].total : 0;
         const totalPages = Math.ceil(total / limit);
 
         res.json({
             success: true,
-            data: data,
-            total: total,
-            page: page,
-            limit: limit,
-            totalPages: totalPages
+            data,
+            total,
+            page,
+            limit,
+            totalPages
         });
 
     } catch (error) {
+        console.error('Error:', error);
         return next(error);
     }
 };
+
 
 
 
@@ -304,6 +303,29 @@ exports.getZonedata=async (req,res)=>{
         
     }
 }
+
+
+
+
+exports.getDesignationData=async (req,res)=>{
+    try {
+        const select_query = `select user_designation from designation_master`
+
+        const result = await executeQuery(select_query)
+        console.log('result: ', result);
+       
+        
+
+        res.status(200).json({data:result})
+
+        
+    } catch (error) {
+        console.log('error: ', error);
+        
+    }
+}
+
+
 
 
 
@@ -567,86 +589,68 @@ exports.Searh_button_api_region = async (req, res) => {
 
 
 exports.getURL_data_zone = async (req, res) => {
-    console.log('hitttt', req.body);
     try {
-        const { page = 1, limit = 10 } = req.query; // Default to page 1 and limit 10 if not provided
-        const offset = (page - 1) * limit; // Calculate the offset for pagination
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (page - 1) * limit;
 
-        // Query to get the total count and paginated data
+        // Query to get total count
+        const countQuery = `SELECT COUNT(DISTINCT zone) AS total_count FROM dealer_master`;
+        const countResult = await executeQuery(countQuery);
+        const totalCount = countResult[0]?.total_count || 0;
+
+        // Query to get paginated data
         const query = `
             SELECT 
-                -- Zone name
                 dm.zone AS zone,
-
-                -- Count of video links for the current zone
-                (SELECT COUNT(*) 
-                 FROM honda_url_data hu 
+                (SELECT COUNT(*) FROM honda_url_data hu 
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
                  AND hu.cdate IS NOT NULL
                  AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS video_send_count,
 
-                -- Count of video clicks for the current zone (with a non-null v_c_date)
-                (SELECT COUNT(*) 
-                 FROM honda_url_data hu
+                (SELECT COUNT(*) FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
-               
                  AND hu.v_click_date IS NOT NULL
                  AND MONTH(hu.v_click_date) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.v_click_date) = YEAR(CURRENT_DATE())) AS video_click_count,
 
-                -- Count of feedback SMS sent for the current zone (based on click_date)
-                (SELECT COUNT(*) 
-                 FROM honda_url_data hu
+                (SELECT COUNT(*) FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
                  AND hu.cdate IS NOT NULL
                  AND MONTH(hu.cdate) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.cdate) = YEAR(CURRENT_DATE())) AS total_feedback_sms_sent,
 
-                -- Count of feedback click records for the current zone
-                (SELECT COUNT(*) 
-                 FROM honda_url_data hu
+                (SELECT COUNT(*) FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
                  AND hu.f_click_date IS NOT NULL
                  AND MONTH(hu.f_click_date) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.f_click_date) = YEAR(CURRENT_DATE())) AS total_feedback_click_count,
 
-                -- Count of feedback SMS related to video click records for the current zone
-                (SELECT COUNT(*) 
-                 FROM honda_url_data hu
+                (SELECT COUNT(*) FROM honda_url_data hu
                  WHERE hu.dealer_code IN (SELECT dealer_code FROM dealer_master WHERE zone = dm.zone) 
                  AND hu.click_date IS NOT NULL 
                  AND hu.feedback_date IS NOT NULL
                  AND MONTH(hu.feedback_date) = MONTH(CURRENT_DATE())
                  AND YEAR(hu.feedback_date) = YEAR(CURRENT_DATE())) AS feedback_sms_video_count
 
-            FROM 
-                dealer_master dm
-
-            -- Group by zone to get counts for each zone
-            GROUP BY 
-                dm.zone
-
-            -- Order the results by the specific zone order
-            ORDER BY 
-                FIELD(dm.zone, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab','HP','JK','CH','Rajasthan','Jharkhand','Chhattisgarh','UP Central',
-                     'Delhi');
+            FROM dealer_master dm
+            GROUP BY dm.zone
+            ORDER BY FIELD(dm.zone, 'UP', 'West', 'UK', 'PMB', 'Bihar', 'Punjab','HP','JK','CH','Rajasthan','Jharkhand','Chhattisgarh','UP Central', 'Delhi')
+            LIMIT ? OFFSET ?;
         `;
 
-        // Execute the query
         const result = await executeQuery(query, [parseInt(limit), parseInt(offset)]);
 
-        // Send the response
         res.status(200).send({
             success: '200',
-            data: result,
+            total_count: totalCount,  // ✅ Total count of all zones
+            data: result,             // ✅ Paginated data
             page,
             limit,
         });
+
     } catch (error) {
         console.error('Error fetching data: ', error);
-
-        // Send an error response
         res.status(500).send({
             success: '500',
             message: 'Internal Server Error',
@@ -654,6 +658,7 @@ exports.getURL_data_zone = async (req, res) => {
         });
     }
 };
+
 
 
 
@@ -894,7 +899,7 @@ const offset = (page - 1) * limit;
                         hu.feedback_date,
                         dm.main_dealer,
                         dm.dealer_name,
-                        dm.dealer_type,
+                        dm.network_type,
                         dm.dealer_code AS Dealer_code,
                         dm.region AS Dealer_region,
                         dm.state AS Dealer_State,
@@ -1016,7 +1021,7 @@ console.log('2222222222');
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1095,7 +1100,7 @@ console.log('2222222222');
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1253,7 +1258,7 @@ if (fromdate != '' && todate != '' && fromdate != "null" && todate != "null") {
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1294,7 +1299,7 @@ if (fromdate != '' && todate != '' && fromdate != "null" && todate != "null") {
                 hu.feedback_date,
                 dm.main_dealer,
                 dm.dealer_name,
-                dm.dealer_type,
+                dm.network_type,
                 dm.dealer_code AS Dealer_code,
                 dm.region AS Dealer_region,
                 dm.state AS Dealer_State,
@@ -1366,7 +1371,7 @@ if (fromdate != '' && todate != '' && fromdate != "null" && todate != "null") {
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1481,7 +1486,7 @@ console.log('2222222222');
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1518,7 +1523,7 @@ console.log('2222222222');
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1591,7 +1596,7 @@ console.log('2222222222');
                     hu.feedback_date,
                     dm.main_dealer,
                     dm.dealer_name,
-                    dm.dealer_type,
+                    dm.network_type,
                     dm.dealer_code AS Dealer_code,
                     dm.region AS Dealer_region,
                     dm.state AS Dealer_State,
@@ -1633,7 +1638,7 @@ console.log('2222222222');
                 hu.feedback_date,
                 dm.main_dealer,
                 dm.dealer_name,
-                dm.dealer_type,
+                dm.network_type,
                 dm.dealer_code AS Dealer_code,
                 dm.region AS Dealer_region,
                 dm.state AS Dealer_State,
@@ -1656,6 +1661,9 @@ console.log('2222222222');
                 FIELD(dm.region, 'Central', 'East', 'North', 'PMB', 'South', 'West')
                   
         `;
+
+
+      
 
         const totaldata111 = await executeQuery(totaldata, [region,]);
        
@@ -1698,6 +1706,7 @@ const s3 = new AWS.S3({
 });
 
 const bucketName = 'hondapdsa';
+
 const folderName = 'datafile/'; // The folder inside the bucket where the file is located
 const filePrefix = 'PDSA_'; // Prefix for files to filter
 
@@ -1727,46 +1736,70 @@ async function getLatestFile() {
     }
 }
 
-// Function to process CSV file and insert data into the database
+// Function to validate mobile numbers (must start with 5-9 and have exactly 10 digits)
+function isValidMobileNumber(number) {
+    return /^[5-9]\d{9}$/.test(number); // Ensures it starts with 5,6,7,8,9 and has exactly 10 digits
+}
+
+// Function to process CSV file and insert valid data into the database
 async function processCsvFile(filePath, fileName) {
     const dataToInsert = [];
-    const batchSize = 1000;
+    let invalidCount = 0; // Counter for invalid mobile numbers
 
     await new Promise((resolve, reject) => {
         fs.createReadStream(filePath)
             .pipe(csvParser())
             .on('data', (row) => {
-                // Prepare row for DB insertion
-                dataToInsert.push([ 
-                    row['Customer First name'] + ' ' + row['Customer Last name'],
-                    row['Customer mobile number'],
-                    row['Frame No'],
-                    row['Dealer_Code'],
-                    row['MODEL_NAME'],
-                    'manthanadmin',
-                    'isly_honda',
-                    fileName,
-                    `${process.env.URL_short_IP}/feedback?id=`,
-                    process.env.LINKVEDIOLINK,
-                    new Date().toISOString().split('T')[0], // Date in yyyy-mm-dd
-                    new Date().toISOString().split('T')[1].split('.')[0] // Time in hh:mm:ss
-                ]);
+                const mobileNumber = row['Customer mobile number'].trim();
+
+                // Validate mobile number before inserting
+                if (isValidMobileNumber(mobileNumber)) {
+                    dataToInsert.push([
+                        row['Customer First name'] + ' ' + row['Customer Last name'],
+                        mobileNumber,
+                        row['Frame No'],
+                        row['Dealer_Code'],
+                        row['MODEL_NAME'],
+                        'manthanadmin',
+                        'isly_honda',
+                        fileName,
+                        `${process.env.URL_short_IP}/feedback?id=`,
+                        process.env.LINKVEDIOLINK,
+                        new Date().toISOString().split('T')[0], // Date in yyyy-mm-dd
+                        new Date().toISOString().split('T')[1].split('.')[0] // Time in hh:mm:ss
+                    ]);
+                } else {
+                    console.error(`Invalid mobile number found: ${mobileNumber}`); // Log invalid number
+                    invalidCount++; // Increment invalid number counter
+                }
             })
             .on('end', resolve)
             .on('error', reject);
     });
-    // Bulk insert the data if available
-    if (dataToInsert.length > 0) {
-        await executeQuery(
-            `INSERT INTO honda_url_data1 (cust_name, mobile_number, frame_no, dealer_code, model_name, admin_id, user_id, filename, feedback_url, vedio_url, create_date, create_time) VALUES ?`,
-            [dataToInsert]
-        );
+
+    // Function to split array into chunks
+    function chunkArray(array, size) {
+        const chunks = [];
+        for (let i = 0; i < array.length; i += size) {
+            chunks.push(array.slice(i, i + size));
+        }
+        return chunks;
     }
 
-    let insert_file_query= `INSERT INTO file_upload_master (filename, filePath) values (?,?) `
+    // Bulk insert in chunks if there are valid records
+    if (dataToInsert.length > 0) {
+        const chunks = chunkArray(dataToInsert, 600);
+        for (const chunk of chunks) {
+            await executeQuery(
+                `INSERT INTO honda_url_data1 (cust_name, mobile_number, frame_no, dealer_code, model_name, admin_id, user_id, filename, feedback_url, vedio_url, create_date, create_time) VALUES ?`,
+                [chunk]
+            );
+        }
+    }
 
-    let execute_query_insert_filename = await executeQuery (insert_file_query, [fileName,filePath])
+    console.log(`Processing complete. Inserted: ${dataToInsert.length}, Skipped invalid: ${invalidCount}`);
 }
+
 
 // Main function to handle file processing and insertion
 exports.InsertDataCsvfile = async (req, res) => {
@@ -1779,7 +1812,7 @@ exports.InsertDataCsvfile = async (req, res) => {
 
         // Check if the file has already been uploaded in the DB
         const existingFile = await executeQuery(
-            `SELECT filename FROM file_upload_master WHERE filename = ?`, 
+            `SELECT filename FROM file_upload_master WHERE filename = ?`,
             [fileName]
         );
 
@@ -1794,6 +1827,22 @@ exports.InsertDataCsvfile = async (req, res) => {
         fs.writeFileSync(localFilePath, fileData.Body);
         console.log(`File downloaded: ${localFilePath}`);
 
+        // ✅ Delete the file from S3 after downloading
+        await s3.deleteObject({ Bucket: bucketName, Key: fileName }).promise();
+        console.log(`File deleted from S3: ${fileName}`);
+
+        // ✅ Prepare date and time
+        const currentDate = new Date();
+        const createDate = currentDate.toISOString().split('T')[0]; // yyyy-mm-dd
+        const createTime = currentDate.toISOString().split('T')[1].split('.')[0]; // hh:mm:ss
+
+        // ✅ Insert filename, date, time, and filepath into file_upload_master
+        await executeQuery(
+            `INSERT INTO file_upload_master (filename, create_date, create_time, filepath) VALUES (?, ?, ?, ?)`,
+            [fileName, createDate, createTime, localFilePath]
+        );
+        console.log(`File metadata inserted into DB: ${fileName}`);
+
         // Process the CSV file and insert data
         await processCsvFile(localFilePath, fileName);
 
@@ -1804,6 +1853,8 @@ exports.InsertDataCsvfile = async (req, res) => {
         res.status(500).json({ success: false, message: 'Internal Server Error', error: error.message });
     }
 };
+
+
 
 
 // exports.InsertDataCsvfile = async (req, res) => {
@@ -1947,6 +1998,137 @@ exports.InsertDataCsvfile = async (req, res) => {
 
 
 
+exports.PdsaUserBalance = async (req, res) => {
+    try {
+
+
+        let select_api_keyquery= `select api_key ,api_pass from customer_master `
+        let resut_query_key = await executeQuery(select_api_keyquery)
+        // console.log('resut_query_key: ', resut_query_key);
+        let api_key=resut_query_key[0].api_key
+        let api_password=resut_query_key[0].api_pass
+
+       let response = await  Balence_fitch_pdsa(api_key,api_password)
+
+       if(response){
+        console.log('response: ', response);
+
+        if(response.success){
+            res.status(200).json({balance:response.balance[0].balance});
+
+        }else{
+
+            // res.status(210).json({
+            
+            // })
+        }
+       }
+       else{
+        res.status(210).json({
+            success:false,
+            message:'No Balance found'
+        });
+       }
+    
+    } catch (error) {
+        console.error('API Request Failed:', error.message);
+        res.status(500).json({ error: "Failed to fetch balance", details: error.message });
+    }
+};
+
+
+
+async function Balence_fitch_pdsa(api_key,api_password){
+    try {
+
+        let data = JSON.stringify({
+            "api_key": api_key,
+            "api_pass": api_password
+          });
+
+
+        let config = {
+            method: 'post',
+            maxBodyLength: Infinity,
+            url: 'https://apipathwp.com/pdsa/whtsapp_balance_check',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            data : data
+          };
+  
+          const response = await axios.request(config);
+       
+        
+          return response.data;
+        
+    } catch (error) {
+        console.log('error: ', error);
+        return false;
+      
+        
+    }
+}
+
+
+
+
+
+exports.GetDataTransaction= async (req,res)=>{
+    try {
+        let select_api_keyquery= `select api_key ,api_pass from customer_master `
+        let resut_query_key = await executeQuery(select_api_keyquery)
+        // console.log('resut_query_key: ', resut_query_key);
+        let api_key=resut_query_key[0].api_key
+        let api_password=resut_query_key[0].api_pass
+
+        let {page , limit} = req.query
+
+      let response = await FitchDataTransaction(api_key,api_password,page,limit)
+      console.log('response: ', response);
+  
+if (response){
+    res.status(200).json({response})
+}           
+    } catch (error) {
+        console.log('error: ', error);
+        
+    }
+}
+
+
+
+async function FitchDataTransaction(api_key,api_password,page,limit) {
+
+    try {
+
+let data = JSON.stringify({
+  "api_key" : api_key ,
+  "api_pass": api_password,
+  "page": page,
+  "limit":limit
+});
+
+let config = {
+  method: 'post',
+  maxBodyLength: Infinity,
+  url: 'https://apipathwp.com/pdsa/transactionhistory',
+  headers: { 
+    'Content-Type': 'application/json'
+  },
+  data : data
+};
+
+ let response= await axios.request(config)
+
+ 
+  return response.data  
+    } catch (error) {
+        console.log('error: ', error);
+        
+    }
+    
+}
 
 
   
